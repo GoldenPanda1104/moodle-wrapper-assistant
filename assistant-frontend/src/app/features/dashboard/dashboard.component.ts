@@ -40,6 +40,7 @@ export class DashboardComponent {
   pipelineRunId: string | null = null;
   pipelineRunning = false;
   pipelineError: string | null = null;
+  pipelineKind: string = 'full';
   isLoading = true;
   isRefreshing = false;
   lastUpdated: Date | null = null;
@@ -53,17 +54,18 @@ export class DashboardComponent {
     this.loadData();
   }
 
-  runPipeline(): void {
+  runPipeline(kind: string = 'full'): void {
     if (this.pipelineRunning) {
       return;
     }
     this.pipelineLogs = [];
     this.pipelineError = null;
     this.pipelineRunId = null;
+    this.pipelineKind = kind;
     this.pipelineRunning = true;
 
     this.pipelineService
-      .runPipeline()
+      .runPipeline(kind)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: ({ run_id }) => {

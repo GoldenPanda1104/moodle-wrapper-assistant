@@ -15,6 +15,15 @@ def list_tasks(db: Session, skip: int = 0, limit: int = 100) -> list[Task]:
     return db.query(Task).offset(skip).limit(limit).all()
 
 
+def get_task_by_title_source(db: Session, title: str, source: str) -> Task | None:
+    return (
+        db.query(Task)
+        .filter(Task.title == title, Task.source == source)
+        .order_by(Task.id.desc())
+        .first()
+    )
+
+
 def create_task(db: Session, task_in: TaskCreate) -> Task:
     data = task_in.model_dump()
     if "metadata" in data:

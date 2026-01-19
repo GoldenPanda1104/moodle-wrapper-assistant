@@ -16,6 +16,7 @@ from app.modules.moodle.scraper import (
 )
 from app.modules.moodle.snapshot import get_last_snapshot, save_snapshot
 from app.modules.moodle.models import MoodleModule
+from app.models.moodle_course import MoodleCourse
 from app.crud import moodle as crud_moodle
 from app.schemas.task import TaskCreate
 from app.services.event_service import log_event
@@ -62,7 +63,8 @@ def _handle_diff(db: Session, diff: dict) -> None:
             category="study",
             metadata=metadata,
         )
-        crud_task.create_task(db, task_in=task_in)
+        if crud_task.get_task_by_title_source(db, task_in.title, task_in.source) is None:
+            crud_task.create_task(db, task_in=task_in)
     elif diff["type"] == "module_detected":
         title = f"Nuevo modulo disponible - {diff['course']} - {diff['module']}"
         task_in = TaskCreate(
@@ -74,7 +76,8 @@ def _handle_diff(db: Session, diff: dict) -> None:
                 "module_id": diff["module_id"],
             },
         )
-        crud_task.create_task(db, task_in=task_in)
+        if crud_task.get_task_by_title_source(db, task_in.title, task_in.source) is None:
+            crud_task.create_task(db, task_in=task_in)
 
 
 async def async_run_pipeline(db: Session) -> None:

@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.modules.moodle.complete import complete_survey as complete_moodle_survey
 from app.modules.moodle.client import build_client_from_settings
 from app.modules.moodle.scraper import scrape as moodle_scrape
+from app.modules.moodle import pipeline as moodle_pipeline
 from app.schemas.moodle_course import MoodleCourseRead
 from app.schemas.moodle_module import MoodleModuleRead
 from app.schemas.moodle_module_survey import MoodleModuleSurveyRead
@@ -178,9 +179,9 @@ async def complete_course_surveys(course_id: int, db: Session = Depends(get_db))
 
 
 @router.post("/pipeline/run")
-async def run_pipeline():
+async def run_pipeline(kind: str = "full"):
     run_id = await pipeline_stream.create_run()
-    asyncio.create_task(_run_pipeline_background(run_id))
+    asyncio.create_task(_run_pipeline_background(run_id, kind))
     return {"run_id": run_id}
 
 
@@ -209,11 +210,12 @@ async def stream_pipeline(run_id: str):
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
     }
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
-async def _run_pipeline_background(run_id: str) -> None:
+async def _run_pipeline_background(run_id: str, kind: str) -> None:
     logger = logging.getLogger("moodle")
     loop = asyncio.get_running_loop()
     handler = _PipelineLogHandler(loop, run_id)
@@ -227,9 +229,9 @@ async def _run_pipeline_background(run_id: str) -> None:
     try:
         await pipeline_stream.publish(
             run_id,
-            PipelineEvent(event="status", message="Pipeline started.").to_payload(),
+            PipelineEvent(event="status", message=f"Pipeline started ({kind}).").to_payload(),
         )
-        await moodle_pipeline.async_run_pipeline(db)
+        await _run_pipeline_by_kind(db, kind)
         await pipeline_stream.mark_done(
             run_id,
             PipelineEvent(event="done", message="Pipeline completed.").to_payload(),
@@ -242,6 +244,22 @@ async def _run_pipeline_background(run_id: str) -> None:
     finally:
         logger.removeHandler(handler)
         db.close()
+
+
+async def _run_pipeline_by_kind(db: Session, kind: str) -> None:
+    normalized = kind.strip().lower()
+    if normalized == "courses":
+        await moodle_pipeline.async_run_courses_pipeline(db)
+    elif normalized == "modules":
+        await moodle_pipeline.async_run_modules_pipeline(db)
+    elif normalized == "surveys":
+        await moodle_pipeline.async_run_surveys_pipeline(db)
+    elif normalized == "grades":
+        await moodle_pipeline.async_run_grades_pipeline(db)
+    elif normalized == "quizzes":
+        await moodle_pipeline.async_run_quizzes_pipeline(db)
+    else:
+        await moodle_pipeline.async_run_pipeline(db)
 
 
 class _PipelineLogHandler(logging.Handler):

@@ -46,17 +46,28 @@ class MoodleClient:
                     if await login_form.count() > 0:
                         await self._page.fill("input[name='username']", self.username)
                         await self._page.fill("input[name='password']", self.password)
-                        await self._page.click("button[type='submit']")
+                await self._page.click("button[type='submit']")
+                await self._page.wait_for_timeout(1500)
 
                 # Basic session validation: dashboard body or user menu.
                 await self._page.goto(f"{self.base_url}/my/", wait_until="domcontentloaded", timeout=30000)
-                await self._page.wait_for_timeout(1000)
+                await self._page.wait_for_timeout(1500)
                 has_dashboard = await self._page.locator("body#page-my-index").count() > 0
                 has_user_menu = await self._page.locator("#user-menu-toggle").count() > 0
                 has_logout = await self._page.locator("a[href*='logout']").count() > 0
+                has_loggedin_body = await self._page.locator("body.loggedin").count() > 0
+                has_userid = await self._page.locator("[data-userid]").count() > 0
 
-                if not (has_dashboard or has_user_menu or has_logout):
-                    raise RuntimeError("Login failed or dashboard not detected.")
+                if not (has_dashboard or has_user_menu or has_logout or has_loggedin_body or has_userid):
+                    # Final fallback: check home page for logged-in indicators.
+                    await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
+                    await self._page.wait_for_timeout(1000)
+                    has_user_menu = await self._page.locator("#user-menu-toggle").count() > 0
+                    has_logout = await self._page.locator("a[href*='logout']").count() > 0
+                    has_loggedin_body = await self._page.locator("body.loggedin").count() > 0
+                    has_userid = await self._page.locator("[data-userid]").count() > 0
+                    if not (has_user_menu or has_logout or has_loggedin_body or has_userid):
+                        raise RuntimeError("Login failed or dashboard not detected.")
 
                 self._logger.info("[Moodle] Login OK")
                 self._session = MoodleSession(base_url=self.base_url, username=self.username)

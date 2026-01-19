@@ -94,6 +94,7 @@ async def _extract_grade_items(
     item_type_filter: set[str] | None = None,
 ) -> list[MoodleGradeItem]:
     items: list[MoodleGradeItem] = []
+    base_items: list[dict] = []
     page = await client.get_page(f"{client.base_url}/grade/report/user/index.php?id={course_id}")
     try:
         await page.wait_for_selector("table.user-grade", timeout=5000)
@@ -106,6 +107,8 @@ async def _extract_grade_items(
     for idx in range(count):
         row = rows.nth(idx)
         link = row.locator("th.column-itemname a.gradeitemheader").first
+        if await link.count() == 0:
+            link = row.locator("th.column-itemname a[href*='mod/']").first
         if await link.count() == 0:
             continue
 
@@ -132,6 +135,19 @@ async def _extract_grade_items(
         if grade_value is None:
             grade_display = ""
 
+        base_items.append(
+            {
+                "id": external_id,
+                "course_id": course_id,
+                "title": title or f"Actividad {idx + 1}",
+                "item_type": item_type,
+                "grade_value": grade_value,
+                "grade_display": grade_display or None,
+                "url": url or None,
+            }
+        )
+
+    for base in base_items:
         available_at = None
         due_at = None
         submission_status = None
@@ -139,6 +155,7 @@ async def _extract_grade_items(
         last_submission_at = None
         attempts_allowed = None
         time_limit_minutes = None
+        url = base.get("url")
         if url and "mod/assign/view.php" in url:
             details = await _extract_assignment_details(client, url)
             available_at = details.get("available_at")
@@ -155,13 +172,13 @@ async def _extract_grade_items(
 
         items.append(
             MoodleGradeItem(
-                id=external_id,
-                course_id=course_id,
-                title=title or f"Actividad {idx + 1}",
-                item_type=item_type,
-                grade_value=grade_value,
-                grade_display=grade_display or None,
-                url=url or None,
+                id=base["id"],
+                course_id=base["course_id"],
+                title=base["title"],
+                item_type=base["item_type"],
+                grade_value=base["grade_value"],
+                grade_display=base["grade_display"],
+                url=url,
                 available_at=available_at,
                 due_at=due_at,
                 submission_status=submission_status,
@@ -435,6 +452,10 @@ async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[st
     }
     try:
         page = await client.get_page(url)
+        try:
+            await page.wait_for_selector(".activity-dates", timeout=3000)
+        except Exception:
+            pass
         date_nodes = page.locator(".activity-dates div")
         date_count = await date_nodes.count()
         for idx in range(date_count):
@@ -447,6 +468,10 @@ async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[st
             elif lowered.startswith("cierre"):
                 details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
 
+        try:
+            await page.wait_for_selector(".submissionstatustable table", timeout=3000)
+        except Exception:
+            pass
         rows = page.locator(".submissionstatustable table tr")
         row_count = await rows.count()
         for idx in range(row_count):
@@ -474,6 +499,10 @@ async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str
     }
     try:
         page = await client.get_page(url)
+        try:
+            await page.wait_for_selector(".activity-dates", timeout=3000)
+        except Exception:
+            pass
         date_nodes = page.locator(".activity-dates div")
         date_count = await date_nodes.count()
         for idx in range(date_count):
@@ -481,11 +510,15 @@ async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str
             if not text:
                 continue
             lowered = _normalize_for_compare(text)
-            if lowered.startswith("abrio") or lowered.startswith("abrió"):
+            if lowered.startswith("abrio"):
                 details["available_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
-            elif lowered.startswith("cierra") or lowered.startswith("cerró"):
+            elif lowered.startswith("cierra") or lowered.startswith("cerro"):
                 details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
 
+        try:
+            await page.wait_for_selector(".quizinfo p", timeout=3000)
+        except Exception:
+            pass
         info_nodes = page.locator(".quizinfo p")
         info_count = await info_nodes.count()
         for idx in range(info_count):
@@ -493,7 +526,7 @@ async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str
             normalized = _normalize_for_compare(text)
             if "intentos permitidos" in normalized:
                 details["attempts_allowed"] = _parse_int_after_label(text)
-            elif "limite de tiempo" in normalized or "límite de tiempo" in normalized:
+            elif "limite de tiempo" in normalized:
                 details["time_limit_minutes"] = _parse_duration_minutes(text)
     except Exception as exc:
         logging.getLogger("moodle").warning("[Moodle] Quiz detail parse failed: %s", exc)
