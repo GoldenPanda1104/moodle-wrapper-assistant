@@ -1,4 +1,4 @@
-import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MoodleCourse } from '../../core/models/moodle-course.model';
@@ -8,7 +8,7 @@ import { MoodleGradeService } from '../../core/services/moodle-grade.service';
 @Component({
   selector: 'app-grades',
   standalone: true,
-  imports: [DatePipe, NgFor, NgIf],
+  imports: [DatePipe, NgFor, NgIf, NgClass],
   templateUrl: './grades.component.html',
   styleUrl: './grades.component.scss',
 })
@@ -43,7 +43,9 @@ export class GradesComponent {
           this.isLoading = false;
           this.lastUpdated = new Date();
           this.courses = Array.from(
-            new Map(items.map((item) => [item.course.id, item.course])).values(),
+            new Map(
+              items.map((item) => [item.course.id, item.course]),
+            ).values(),
           );
         },
         error: () => {
@@ -111,5 +113,41 @@ export class GradesComponent {
       return 'Tiempo: -';
     }
     return `Tiempo: ${item.time_limit_minutes} min`;
+  }
+
+  formatGradeColor(item: MoodleGradeItem): string {
+    if (item.grade_value === null || item.grade_value === undefined) {
+      return 'zinc-500';
+    }
+    if (item.grade_value >= 90) {
+      return 'green-500';
+    }
+    if (item.grade_value >= 70) {
+      return 'yellow-500';
+    }
+    return 'red-500';
+  }
+
+  gradeBadgeClasses(item: MoodleGradeItem): string {
+    const isMissing =
+      item.grade_value === null || item.grade_value === undefined;
+    const isHigh = !isMissing && item.grade_value! >= 90;
+    const isMid =
+      !isMissing && item.grade_value! < 90 && item.grade_value! >= 70;
+    const isLow = !isMissing && item.grade_value! < 70;
+
+    if (isMissing) {
+      return 'bg-zinc-500 text-white';
+    }
+    if (isHigh) {
+      return 'bg-emerald-500 text-white';
+    }
+    if (isMid) {
+      return 'bg-yellow-500 text-slate-900';
+    }
+    if (isLow) {
+      return 'bg-red-500 text-white';
+    }
+    return 'bg-zinc-500 text-white';
   }
 }

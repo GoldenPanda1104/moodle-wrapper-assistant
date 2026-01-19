@@ -7,6 +7,7 @@ import unicodedata
 from dataclasses import asdict
 from datetime import datetime, timezone
 
+import dateparser
 from app.modules.moodle.client import MoodleClient
 from app.modules.moodle.models import (
     MoodleCourse,
@@ -452,21 +453,9 @@ async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[st
     }
     try:
         page = await client.get_page(url)
-        try:
-            await page.wait_for_selector(".activity-dates", timeout=3000)
-        except Exception:
-            pass
-        date_nodes = page.locator(".activity-dates div")
-        date_count = await date_nodes.count()
-        for idx in range(date_count):
-            text = _normalize_text((await date_nodes.nth(idx).text_content()) or "")
-            if not text:
-                continue
-            lowered = _normalize_for_compare(text)
-            if lowered.startswith("apertura"):
-                details["available_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
-            elif lowered.startswith("cierre"):
-                details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+        available_at, due_at = await _extract_activity_dates(page)
+        details["available_at"] = available_at
+        details["due_at"] = due_at
 
         try:
             await page.wait_for_selector(".submissionstatustable table", timeout=3000)
@@ -499,21 +488,9 @@ async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str
     }
     try:
         page = await client.get_page(url)
-        try:
-            await page.wait_for_selector(".activity-dates", timeout=3000)
-        except Exception:
-            pass
-        date_nodes = page.locator(".activity-dates div")
-        date_count = await date_nodes.count()
-        for idx in range(date_count):
-            text = _normalize_text((await date_nodes.nth(idx).text_content()) or "")
-            if not text:
-                continue
-            lowered = _normalize_for_compare(text)
-            if lowered.startswith("abrio"):
-                details["available_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
-            elif lowered.startswith("cierra") or lowered.startswith("cerro"):
-                details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+        available_at, due_at = await _extract_activity_dates(page)
+        details["available_at"] = available_at
+        details["due_at"] = due_at
 
         try:
             await page.wait_for_selector(".quizinfo p", timeout=3000)
@@ -533,6 +510,62 @@ async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str
     return details
 
 
+async def _extract_activity_dates(page: Page) -> tuple[str | None, str | None]:
+    def parse_lines(lines: list[str]) -> tuple[str | None, str | None]:
+        available_at = None
+        due_at = None
+        for line in lines:
+            text = _normalize_text(line)
+            if not text:
+                continue
+            lowered = _normalize_for_compare(text)
+            if any(keyword in lowered for keyword in ("apertura", "abre", "abrio")):
+                available_at = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+            elif any(keyword in lowered for keyword in ("cierre", "cierra", "cerro")):
+                due_at = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+        return available_at, due_at
+
+    selectors = [
+        ".activity-dates div",
+        "[data-region='activity-dates'] div",
+        ".activity-information .activity-dates div",
+    ]
+    for selector in selectors:
+        try:
+            await page.wait_for_selector(selector, timeout=3000)
+        except Exception:
+            continue
+        nodes = page.locator(selector)
+        count = await nodes.count()
+        if count == 0:
+            continue
+        lines = []
+        for idx in range(count):
+            lines.append((await nodes.nth(idx).text_content()) or "")
+        available_at, due_at = parse_lines(lines)
+        if available_at or due_at:
+            return available_at, due_at
+
+    container_selectors = [
+        ".activity-dates",
+        "[data-region='activity-dates']",
+        ".activity-information .activity-dates",
+    ]
+    for selector in container_selectors:
+        container = page.locator(selector).first
+        if await container.count() == 0:
+            continue
+        try:
+            raw = (await container.inner_text()) or ""
+        except Exception:
+            continue
+        lines = [line for line in raw.splitlines() if line.strip()]
+        available_at, due_at = parse_lines(lines)
+        if available_at or due_at:
+            return available_at, due_at
+    return None, None
+
+
 def _normalize_for_compare(value: str) -> str:
     lowered = _normalize_text(value).lower()
     normalized = unicodedata.normalize("NFKD", lowered)
@@ -549,6 +582,20 @@ def _parse_spanish_datetime(value: str) -> datetime | None:
     if not value:
         return None
     cleaned = _normalize_text(value)
+    parsed = dateparser.parse(
+        cleaned,
+        languages=["es"],
+        settings={
+            "RETURN_AS_TIMEZONE_AWARE": True,
+            "TIMEZONE": "UTC",
+            "PREFER_DAY_OF_MONTH": "first",
+        },
+    )
+    if parsed:
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    cleaned = re.sub(r"^[^\\d,]+,\\s*", "", cleaned)
     match = re.search(
         r"(\\d{1,2}) de ([a-zA-Záéíóúñ]+) de (\\d{4}), (\\d{2}):(\\d{2})",
         cleaned,
