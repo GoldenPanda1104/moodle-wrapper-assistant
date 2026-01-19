@@ -7,20 +7,25 @@
 :root {
   color-scheme: light;
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --surface: #f8fafc;
+  --surface-elevated: #ffffff;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --border: rgba(148, 163, 184, 0.35);
 }
 
 body {
   margin: 0;
-  background: #f6f7f8;
+  background: var(--surface);
 }
 
 .bg-app {
-  background-color: #f6f7f8;
+  background-color: var(--surface);
   background-image:
-    radial-gradient(circle at 10% 20%, rgba(148, 163, 184, 0.15), transparent 45%),
-    radial-gradient(circle at 90% 10%, rgba(71, 85, 105, 0.12), transparent 40%),
-    linear-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.2) 1px, transparent 1px);
-  background-size: auto, auto, 48px 48px, 48px 48px;
-  background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+    radial-gradient(circle at 12% 16%, rgba(37, 99, 235, 0.12), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgba(14, 116, 144, 0.1), transparent 45%),
+    radial-gradient(circle at 85% 90%, rgba(59, 130, 246, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(248, 250, 252, 1));
+  background-size: auto;
+  background-position: 0 0;
 }

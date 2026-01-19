@@ -80,6 +80,7 @@ async def async_run_pipeline(db: Session) -> None:
         course_map = crud_moodle.upsert_courses(db, data.get("courses", []))
         module_map = crud_moodle.upsert_modules(db, data.get("modules", []), course_map)
         crud_moodle.upsert_module_surveys(db, data.get("module_surveys", []), module_map)
+        crud_moodle.upsert_grade_items(db, data.get("grade_items", []), course_map)
         previous = get_last_snapshot()
         diffs = diff_snapshots(previous.data if previous else None, data)
         save_snapshot(data)

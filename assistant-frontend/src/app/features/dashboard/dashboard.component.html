@@ -27,6 +27,83 @@
   </div>
 
   <div *ngIf="!isLoading" class="space-y-8">
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[12px] font-mono uppercase tracking-[0.2em] text-slate-500">RELEVANTE</h2>
+        <span class="text-[11px] uppercase text-slate-400">
+          {{ pendingSurveys.length + pendingAssignments.length }} pendientes
+        </span>
+      </div>
+      <div class="grid gap-4 lg:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="text-xs uppercase tracking-wide text-slate-400">Encuestas por hacer</div>
+              <h3 class="text-base font-semibold text-slate-900">Encuestas</h3>
+            </div>
+            <span class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500">
+              {{ pendingSurveys.length }} pendientes
+            </span>
+          </div>
+          <div class="mt-3 space-y-3">
+            <div *ngFor="let survey of pendingSurveys" class="flex items-start justify-between gap-3">
+              <div class="space-y-1">
+                <div class="text-sm font-semibold text-slate-900">{{ survey.title }}</div>
+                <div class="text-xs text-slate-500">{{ formatCourseName(survey.course) }}</div>
+              </div>
+              <a
+                *ngIf="survey.url"
+                [href]="survey.url"
+                target="_blank"
+                rel="noreferrer"
+                class="text-xs font-semibold uppercase tracking-wide text-blue-600"
+              >
+                Abrir
+              </a>
+            </div>
+            <div *ngIf="pendingSurveys.length === 0" class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+              No hay encuestas pendientes.
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="text-xs uppercase tracking-wide text-slate-400">Tareas por entregar</div>
+              <h3 class="text-base font-semibold text-slate-900">Tareas</h3>
+            </div>
+            <span class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500">
+              {{ pendingAssignments.length }} pendientes
+            </span>
+          </div>
+          <div class="mt-3 space-y-3">
+            <div *ngFor="let item of pendingAssignments" class="flex items-start justify-between gap-3">
+              <div class="space-y-1">
+                <div class="text-sm font-semibold text-slate-900">{{ item.title }}</div>
+                <div class="text-xs text-slate-500">{{ formatCourseName(item.course) }}</div>
+                <div class="text-xs text-slate-400" *ngIf="item.due_at">
+                  Cierre {{ item.due_at | date: "medium" }}
+                </div>
+              </div>
+              <a
+                *ngIf="item.url"
+                [href]="item.url"
+                target="_blank"
+                rel="noreferrer"
+                class="text-xs font-semibold uppercase tracking-wide text-blue-600"
+              >
+                Abrir
+              </a>
+            </div>
+            <div *ngIf="pendingAssignments.length === 0" class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+              No hay tareas pendientes.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="grid gap-6 lg:grid-cols-2">
       <section class="space-y-3">
         <div class="flex items-center justify-between">
@@ -64,6 +141,40 @@
         <app-event-row *ngFor="let event of recentEvents" [event]="event"></app-event-row>
         <div *ngIf="recentEvents.length === 0" class="p-4 text-sm text-slate-500">
           No se registran eventos recientes.
+        </div>
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="space-y-1">
+          <h2 class="text-[12px] font-mono uppercase tracking-[0.2em] text-slate-500">PIPELINE MOODLE</h2>
+          <p class="text-xs text-slate-500">Ejecucion manual con salida en tiempo real.</p>
+        </div>
+        <button
+          type="button"
+          (click)="runPipeline()"
+          [disabled]="pipelineRunning"
+          class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {{ pipelineRunning ? 'Ejecutando...' : 'Ejecutar pipeline' }}
+        </button>
+      </div>
+      <div class="rounded border border-slate-200 bg-slate-950/90 p-4 text-xs text-slate-100">
+        <div *ngIf="pipelineError" class="mb-2 text-rose-300">
+          {{ pipelineError }}
+        </div>
+        <div *ngIf="pipelineLogs.length === 0" class="text-slate-400">
+          Sin actividad registrada.
+        </div>
+        <div class="max-h-64 space-y-1 overflow-y-auto font-mono">
+          <div *ngFor="let entry of pipelineLogs" class="flex flex-wrap gap-2">
+            <span class="text-slate-400" *ngIf="entry.ts">
+              {{ entry.ts | date: 'HH:mm:ss' }}
+            </span>
+            <span class="uppercase text-slate-300" *ngIf="entry.level">{{ entry.level }}</span>
+            <span class="text-slate-100">{{ entry.message }}</span>
+          </div>
         </div>
       </div>
     </section>

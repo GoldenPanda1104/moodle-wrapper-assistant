@@ -3,11 +3,127 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Dict, Iterable
 
-from sqlalchemy.orm import Session
-
 from app.models.moodle_course import MoodleCourse
 from app.models.moodle_module import MoodleModule
 from app.models.moodle_module_survey import MoodleModuleSurvey
+from app.models.moodle_grade_item import MoodleGradeItem
+from sqlalchemy.orm import Session, joinedload
+
+
+def get_course(db: Session, course_id: int) -> MoodleCourse | None:
+    return db.query(MoodleCourse).filter(MoodleCourse.id == course_id).first()
+
+
+def list_courses(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    search: str | None = None,
+) -> list[MoodleCourse]:
+    query = db.query(MoodleCourse)
+    if search:
+        query = query.filter(MoodleCourse.name.ilike(f"%{search}%"))
+    return query.order_by(MoodleCourse.name.asc()).offset(skip).limit(limit).all()
+
+
+def get_module(db: Session, module_id: int) -> MoodleModule | None:
+    return (
+        db.query(MoodleModule)
+        .options(joinedload(MoodleModule.course))
+        .filter(MoodleModule.id == module_id)
+        .first()
+    )
+
+
+def list_modules(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    course_id: int | None = None,
+    visible: bool | None = None,
+    has_survey: bool | None = None,
+) -> list[MoodleModule]:
+    query = db.query(MoodleModule).options(joinedload(MoodleModule.course))
+    if course_id is not None:
+        query = query.filter(MoodleModule.course_id == course_id)
+    if visible is not None:
+        query = query.filter(MoodleModule.visible == visible)
+    if has_survey is not None:
+        query = query.filter(MoodleModule.has_survey == has_survey)
+    return (
+        query.order_by(MoodleModule.course_id.asc(), MoodleModule.external_id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_module_survey(db: Session, survey_id: int) -> MoodleModuleSurvey | None:
+    return (
+        db.query(MoodleModuleSurvey)
+        .options(joinedload(MoodleModuleSurvey.course), joinedload(MoodleModuleSurvey.module))
+        .filter(MoodleModuleSurvey.id == survey_id)
+        .first()
+    )
+
+
+def list_module_surveys(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    course_id: int | None = None,
+    module_id: int | None = None,
+) -> list[MoodleModuleSurvey]:
+    query = db.query(MoodleModuleSurvey).options(
+        joinedload(MoodleModuleSurvey.course),
+        joinedload(MoodleModuleSurvey.module),
+    )
+    if course_id is not None:
+        query = query.filter(MoodleModuleSurvey.course_id == course_id)
+    if module_id is not None:
+        query = query.filter(MoodleModuleSurvey.module_id == module_id)
+    return (
+        query.order_by(
+            MoodleModuleSurvey.completed_at.isnot(None).asc(),
+            MoodleModuleSurvey.course_id.asc(),
+            MoodleModuleSurvey.external_id.asc(),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def list_grade_items(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    course_id: int | None = None,
+    item_type: str | None = None,
+) -> list[MoodleGradeItem]:
+    query = db.query(MoodleGradeItem).options(joinedload(MoodleGradeItem.course))
+    if course_id is not None:
+        query = query.filter(MoodleGradeItem.course_id == course_id)
+    if item_type is not None:
+        query = query.filter(MoodleGradeItem.item_type == item_type)
+    return (
+        query.order_by(
+            MoodleGradeItem.course_id.asc(),
+            MoodleGradeItem.external_id.asc(),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def mark_survey_completed(db: Session, survey: MoodleModuleSurvey) -> MoodleModuleSurvey:
+    now = datetime.now(timezone.utc)
+    survey.completed_at = now
+    db.add(survey)
+    db.commit()
+    db.refresh(survey)
+    return survey
 
 
 def upsert_courses(db: Session, courses: Iterable[dict]) -> Dict[str, MoodleCourse]:
@@ -119,15 +235,90 @@ def upsert_module_surveys(
         if stored:
             stored.title = survey["title"]
             stored.url = survey.get("url")
+            stored.completion_url = survey.get("completion_url")
+            stored.course_id = module.course_id
             stored.last_seen_at = now
         else:
             stored = MoodleModuleSurvey(
                 module_id=module.id,
+                course_id=module.course_id,
                 external_id=survey["id"],
                 title=survey["title"],
                 url=survey.get("url"),
+                completion_url=survey.get("completion_url"),
                 last_seen_at=now,
             )
             db.add(stored)
 
     db.commit()
+
+
+def upsert_grade_items(
+    db: Session,
+    items: Iterable[dict],
+    course_map: Dict[str, MoodleCourse],
+) -> None:
+    item_list = list(items)
+    if not item_list or not course_map:
+        return
+
+    course_ids = {course.id for course in course_map.values()}
+    existing = (
+        db.query(MoodleGradeItem)
+        .filter(MoodleGradeItem.course_id.in_(course_ids))
+        .all()
+    )
+    existing_map = {(item.course_id, item.external_id): item for item in existing}
+    now = datetime.now(timezone.utc)
+
+    for item in item_list:
+        course = course_map.get(item["course_id"])
+        if not course:
+            continue
+        key = (course.id, item["id"])
+        stored = existing_map.get(key)
+        available_at = _coerce_datetime(item.get("available_at"))
+        due_at = _coerce_datetime(item.get("due_at"))
+        last_submission_at = _coerce_datetime(item.get("last_submission_at"))
+        if stored:
+            stored.title = item["title"]
+            stored.item_type = item["item_type"]
+            stored.grade_value = item.get("grade_value")
+            stored.grade_display = item.get("grade_display")
+            stored.url = item.get("url")
+            stored.available_at = available_at
+            stored.due_at = due_at
+            stored.submission_status = item.get("submission_status")
+            stored.grading_status = item.get("grading_status")
+            stored.last_submission_at = last_submission_at
+            stored.last_seen_at = now
+        else:
+            stored = MoodleGradeItem(
+                course_id=course.id,
+                external_id=item["id"],
+                item_type=item["item_type"],
+                title=item["title"],
+                grade_value=item.get("grade_value"),
+                grade_display=item.get("grade_display"),
+                url=item.get("url"),
+                available_at=available_at,
+                due_at=due_at,
+                submission_status=item.get("submission_status"),
+                grading_status=item.get("grading_status"),
+                last_submission_at=last_submission_at,
+                last_seen_at=now,
+            )
+            db.add(stored)
+
+    db.commit()
+
+
+def _coerce_datetime(value: str | datetime | None) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None

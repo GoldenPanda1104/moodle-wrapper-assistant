@@ -8,6 +8,12 @@ import { Task } from '../../core/models/task.model';
 import { EventLog } from '../../core/models/event.model';
 import { TaskCardComponent } from '../../shared/components/task-card/task-card.component';
 import { EventRowComponent } from '../../shared/components/event-row/event-row.component';
+import { MoodlePipelineService, PipelineEvent } from '../../core/services/moodle-pipeline.service';
+import { MoodleSurveyService } from '../../core/services/moodle-survey.service';
+import { MoodleGradeService } from '../../core/services/moodle-grade.service';
+import { MoodleSurvey } from '../../core/models/moodle-survey.model';
+import { MoodleGradeItem } from '../../core/models/moodle-grade-item.model';
+import { MoodleCourse } from '../../core/models/moodle-course.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -19,11 +25,20 @@ import { EventRowComponent } from '../../shared/components/event-row/event-row.c
 export class DashboardComponent {
   private readonly taskService = inject(TaskService);
   private readonly eventService = inject(EventService);
+  private readonly pipelineService = inject(MoodlePipelineService);
+  private readonly surveyService = inject(MoodleSurveyService);
+  private readonly gradeService = inject(MoodleGradeService);
   private readonly destroyRef = inject(DestroyRef);
 
   todayTasks: Task[] = [];
   blockedTasks: Task[] = [];
+  pendingSurveys: MoodleSurvey[] = [];
+  pendingAssignments: MoodleGradeItem[] = [];
   recentEvents: EventLog[] = [];
+  pipelineLogs: PipelineEvent[] = [];
+  pipelineRunId: string | null = null;
+  pipelineRunning = false;
+  pipelineError: string | null = null;
   isLoading = true;
   isRefreshing = false;
   lastUpdated: Date | null = null;
@@ -37,19 +52,72 @@ export class DashboardComponent {
     this.loadData();
   }
 
+  runPipeline(): void {
+    if (this.pipelineRunning) {
+      return;
+    }
+    this.pipelineLogs = [];
+    this.pipelineError = null;
+    this.pipelineRunId = null;
+    this.pipelineRunning = true;
+
+    this.pipelineService
+      .runPipeline()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ run_id }) => {
+          this.pipelineRunId = run_id;
+          this.pipelineService
+            .streamPipeline(run_id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (entry) => {
+                this.pipelineLogs = [...this.pipelineLogs, entry].slice(-200);
+                if (entry.event === 'done') {
+                  this.pipelineRunning = false;
+                }
+              },
+              error: () => {
+                this.pipelineRunning = false;
+                this.pipelineError = 'Pipeline stream disconnected.';
+              },
+            });
+        },
+        error: () => {
+          this.pipelineRunning = false;
+          this.pipelineError = 'Unable to start pipeline.';
+        },
+      });
+  }
+
   private loadData(): void {
     forkJoin({
       tasks: this.taskService.getTasks(),
-      events: this.eventService.getRecentEvents(10)
+      events: this.eventService.getRecentEvents(10),
+      surveys: this.surveyService.getSurveys(),
+      grades: this.gradeService.getGradeItems(),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ tasks, events }) => {
+        next: ({ tasks, events, surveys, grades }) => {
           this.todayTasks = tasks.filter(
             (task) => task.status === 'ready' || task.status === 'pending'
           );
           this.blockedTasks = tasks.filter((task) => task.status === 'blocked');
           this.recentEvents = events;
+          this.pendingSurveys = surveys
+            .filter((survey) => !survey.completed_at)
+            .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
+            .slice(0, 6);
+          this.pendingAssignments = grades
+            .filter((item) => {
+              if (item.submission_status) {
+                return !item.submission_status.toLowerCase().includes('enviado');
+              }
+              return item.grade_value === null;
+            })
+            .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
+            .slice(0, 6);
           this.isLoading = false;
           this.isRefreshing = false;
           this.lastUpdated = new Date();
@@ -59,6 +127,20 @@ export class DashboardComponent {
           this.isRefreshing = false;
         }
       });
+  }
+
+  formatCourseName(course?: MoodleCourse | null): string {
+    if (!course) {
+      return 'Curso';
+    }
+    return course.name.replace('UDH_B1_', '').split('(')[0].trim();
+  }
+
+  formatDueDate(value: string | null): string {
+    if (!value) {
+      return 'Sin fecha';
+    }
+    return value;
   }
 
 }

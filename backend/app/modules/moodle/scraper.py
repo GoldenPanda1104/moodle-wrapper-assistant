@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import unicodedata
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 from app.modules.moodle.client import MoodleClient
-from app.modules.moodle.models import MoodleCourse, MoodleModule, MoodleModuleSurvey
+from app.modules.moodle.models import (
+    MoodleCourse,
+    MoodleGradeItem,
+    MoodleModule,
+    MoodleModuleSurvey,
+)
 from playwright.async_api import Locator, Page
 
 
@@ -15,6 +22,7 @@ async def scrape(client: MoodleClient) -> dict:
     courses: list[MoodleCourse] = []
     modules: list[MoodleModule] = []
     module_surveys: list[MoodleModuleSurvey] = []
+    grade_items: list[MoodleGradeItem] = []
 
     for attempt in range(3):
         try:
@@ -24,11 +32,13 @@ async def scrape(client: MoodleClient) -> dict:
                 courses.append(MoodleCourse(id=course["id"], name=course["name"]))
                 page = await client.get_course_page(course["id"])
                 modules.extend(await _extract_modules(page, course["id"]))
+                grade_items.extend(await _extract_grade_items(client, course["id"]))
 
             modules, module_surveys = await _enrich_modules_with_surveys(client, modules)
 
             logger.info("[Moodle] Modulos detectados: %s", len(modules))
             logger.info("[Moodle] Encuestas detectadas: %s", len(module_surveys))
+            logger.info("[Moodle] Calificaciones detectadas: %s", len(grade_items))
             break
         except Exception as exc:
             logger.warning("[Moodle] Scrape attempt %s failed: %s", attempt + 1, exc)
@@ -41,6 +51,7 @@ async def scrape(client: MoodleClient) -> dict:
         "courses": [asdict(course) for course in courses],
         "modules": [asdict(module) for module in modules],
         "module_surveys": [asdict(survey) for survey in module_surveys],
+        "grade_items": [asdict(item) for item in grade_items],
     }
     return data
 
@@ -50,6 +61,76 @@ async def _extract_modules(page: Page, course_id: str) -> list[MoodleModule]:
     if modules:
         return modules
     return await _extract_modules_from_activity_list(page, course_id)
+
+
+async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[MoodleGradeItem]:
+    items: list[MoodleGradeItem] = []
+    page = await client.get_page(f"{client.base_url}/grade/report/user/index.php?id={course_id}")
+    try:
+        await page.wait_for_selector("table.user-grade", timeout=5000)
+    except Exception:
+        logging.getLogger("moodle").warning("[Moodle] No grade table found for course %s", course_id)
+        return items
+
+    rows = page.locator("table.user-grade tbody tr")
+    count = await rows.count()
+    for idx in range(count):
+        row = rows.nth(idx)
+        link = row.locator("th.column-itemname a.gradeitemheader").first
+        if await link.count() == 0:
+            continue
+
+        title = _normalize_text((await link.text_content()) or "")
+        url = await link.get_attribute("href") or ""
+        external_id = _extract_activity_id_from_url(url) or f"{course_id}-item-{idx + 1}"
+
+        item_type_label = _normalize_text(await _text_or_empty(row, "th.column-itemname .dimmed_text"))
+        if not item_type_label:
+            icon = row.locator("th.column-itemname img[alt]").first
+            if await icon.count() > 0:
+                item_type_label = _normalize_text((await icon.get_attribute("alt")) or "")
+        item_type = _map_grade_item_type(item_type_label)
+        if item_type != "assignment":
+            continue
+
+        grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade div.d-flex > div:first-child"))
+        if not grade_display:
+            grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade"))
+        grade_value = _parse_grade_value(grade_display)
+        if grade_value is None:
+            grade_display = ""
+
+        available_at = None
+        due_at = None
+        submission_status = None
+        grading_status = None
+        last_submission_at = None
+        if url and "mod/assign/view.php" in url:
+            details = await _extract_assignment_details(client, url)
+            available_at = details.get("available_at")
+            due_at = details.get("due_at")
+            submission_status = details.get("submission_status")
+            grading_status = details.get("grading_status")
+            last_submission_at = details.get("last_submission_at")
+
+        items.append(
+            MoodleGradeItem(
+                id=external_id,
+                course_id=course_id,
+                title=title or f"Actividad {idx + 1}",
+                item_type=item_type,
+                grade_value=grade_value,
+                grade_display=grade_display or None,
+                url=url or None,
+                available_at=available_at,
+                due_at=due_at,
+                submission_status=submission_status,
+                grading_status=grading_status,
+                last_submission_at=last_submission_at,
+            )
+        )
+
+    return items
 
 
 async def _extract_modules_from_courseindex(page: Page, course_id: str) -> list[MoodleModule]:
@@ -226,6 +307,13 @@ async def _extract_module_surveys(
             link = activity.locator("a[href]").first
         href = await link.get_attribute("href") or ""
 
+        completion_url = None
+        if activity_id.isdigit() and module.course_id.isdigit():
+            completion_url = (
+                "https://moodle.uip.edu.pa/mod/feedback/complete.php"
+                f"?id={activity_id}&courseid={module.course_id}"
+            )
+
         surveys.append(
             MoodleModuleSurvey(
                 id=activity_id,
@@ -233,6 +321,7 @@ async def _extract_module_surveys(
                 course_id=module.course_id,
                 title=title or "Enviar encuesta",
                 url=href or None,
+                completion_url=completion_url,
             )
         )
 
@@ -250,3 +339,130 @@ def _matches_survey_name(value: str) -> bool:
     normalized = unicodedata.normalize("NFKD", lowered)
     normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
     return "envianos tu opinion" in normalized
+
+
+def _map_grade_item_type(value: str) -> str | None:
+    if not value:
+        return None
+    lowered = _normalize_text(value).lower()
+    normalized = unicodedata.normalize("NFKD", lowered)
+    normalized = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    if "tarea" in normalized:
+        return "assignment"
+    if "cuestionario" in normalized or "quiz" in normalized:
+        return "quiz"
+    return None
+
+
+def _parse_grade_value(value: str) -> float | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if cleaned == "-" or cleaned.lower() == "na":
+        return None
+    cleaned = cleaned.replace("%", "").strip()
+    cleaned = cleaned.replace(".", "").replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _extract_activity_id_from_url(url: str) -> str | None:
+    if "id=" not in url:
+        return None
+    return url.split("id=")[-1].split("&")[0]
+
+
+async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[str, str | None]:
+    details: dict[str, str | None] = {
+        "available_at": None,
+        "due_at": None,
+        "submission_status": None,
+        "grading_status": None,
+        "last_submission_at": None,
+    }
+    try:
+        page = await client.get_page(url)
+        date_nodes = page.locator(".activity-dates div")
+        date_count = await date_nodes.count()
+        for idx in range(date_count):
+            text = _normalize_text((await date_nodes.nth(idx).text_content()) or "")
+            if not text:
+                continue
+            lowered = _normalize_for_compare(text)
+            if lowered.startswith("apertura"):
+                details["available_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+            elif lowered.startswith("cierre"):
+                details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+
+        rows = page.locator(".submissionstatustable table tr")
+        row_count = await rows.count()
+        for idx in range(row_count):
+            row = rows.nth(idx)
+            label = _normalize_text(await _text_or_empty(row, "th"))
+            value = _normalize_text(await _text_or_empty(row, "td"))
+            normalized_label = _normalize_for_compare(label)
+            if "estado de la entrega" in normalized_label:
+                details["submission_status"] = value or None
+            elif "estado de la calificacion" in normalized_label:
+                details["grading_status"] = value or None
+            elif "ultima modificacion" in normalized_label:
+                details["last_submission_at"] = _format_datetime(_parse_spanish_datetime(value))
+    except Exception as exc:
+        logging.getLogger("moodle").warning("[Moodle] Assignment detail parse failed: %s", exc)
+    return details
+
+
+def _normalize_for_compare(value: str) -> str:
+    lowered = _normalize_text(value).lower()
+    normalized = unicodedata.normalize("NFKD", lowered)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def _split_after_label(value: str) -> str:
+    if ":" not in value:
+        return value
+    return value.split(":", 1)[1].strip()
+
+
+def _parse_spanish_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    cleaned = _normalize_text(value)
+    match = re.search(
+        r"(\\d{1,2}) de ([a-zA-Záéíóúñ]+) de (\\d{4}), (\\d{2}):(\\d{2})",
+        cleaned,
+    )
+    if not match:
+        return None
+    day = int(match.group(1))
+    month_name = _normalize_for_compare(match.group(2))
+    year = int(match.group(3))
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+    months = {
+        "enero": 1,
+        "febrero": 2,
+        "marzo": 3,
+        "abril": 4,
+        "mayo": 5,
+        "junio": 6,
+        "julio": 7,
+        "agosto": 8,
+        "septiembre": 9,
+        "setiembre": 9,
+        "octubre": 10,
+        "noviembre": 11,
+        "diciembre": 12,
+    }
+    month = months.get(month_name)
+    if not month:
+        return None
+    return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+
+
+def _format_datetime(value: datetime | None) -> str | None:
+    if not value:
+        return None
+    return value.isoformat()
