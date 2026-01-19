@@ -27,6 +27,13 @@
       >
         Actualizar
       </button>
+      <button
+        type="button"
+        (click)="completeAllSurveys()"
+        class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900"
+      >
+        Completar todos
+      </button>
     </div>
   </header>
 
@@ -54,7 +61,8 @@
         >
           <div class="space-y-1">
             <div class="text-xs uppercase tracking-wide text-slate-400">
-              {{ formatCourseName(survey.course!) }} - {{ survey.module?.title }}
+              {{ formatCourseName(survey.course!) }} -
+              {{ survey.module?.title }}
             </div>
             <h2 class="text-base font-semibold text-slate-900">
               {{ survey.title }}
@@ -89,15 +97,30 @@
               [disabled]="completing.has(survey.id) || survey.completed_at"
               class="inline-flex items-center rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {{ survey.completed_at ? "Completada" : (completing.has(survey.id) ? "Enviando..." : "Completar auto") }}
+              {{
+                survey.completed_at
+                  ? "Completada"
+                  : completing.has(survey.id)
+                    ? "Enviando..."
+                    : "Completar auto"
+              }}
             </button>
-            <div *ngIf="survey.completed_at" class="text-[11px] uppercase text-emerald-600">
+            <div
+              *ngIf="survey.completed_at"
+              class="text-[11px] uppercase text-emerald-600"
+            >
               Completada {{ survey.completed_at | date: "medium" }}
             </div>
-            <div *ngIf="completed.has(survey.id)" class="text-[11px] uppercase text-emerald-600">
+            <div
+              *ngIf="completed.has(survey.id)"
+              class="text-[11px] uppercase text-emerald-600"
+            >
               Enviada
             </div>
-            <div *ngIf="completionErrors.get(survey.id)" class="text-[11px] uppercase text-rose-600">
+            <div
+              *ngIf="completionErrors.get(survey.id)"
+              class="text-[11px] uppercase text-rose-600"
+            >
               {{ completionErrors.get(survey.id) }}
             </div>
           </div>

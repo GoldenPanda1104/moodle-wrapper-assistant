@@ -18,6 +18,8 @@ class MoodleGradeItemRead(BaseModel):
     submission_status: str | None
     grading_status: str | None
     last_submission_at: datetime | None
+    attempts_allowed: int | None
+    time_limit_minutes: int | None
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime

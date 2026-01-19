@@ -14,6 +14,8 @@ export interface MoodleGradeItem {
   submission_status: string | null;
   grading_status: string | null;
   last_submission_at: string | null;
+  attempts_allowed: number | null;
+  time_limit_minutes: number | null;
   last_seen_at: string;
   created_at: string;
   updated_at: string;

@@ -88,4 +88,28 @@ export class GradesComponent {
   formatDue(item: MoodleGradeItem): string {
     return item.due_at ? item.due_at : '';
   }
+
+  formatItemType(item: MoodleGradeItem): string {
+    if (item.item_type === 'assignment') {
+      return 'Tarea';
+    }
+    if (item.item_type === 'quiz') {
+      return 'Cuestionario';
+    }
+    return item.item_type;
+  }
+
+  formatAttempts(item: MoodleGradeItem): string {
+    if (item.attempts_allowed === null || item.attempts_allowed === undefined) {
+      return 'Intentos: -';
+    }
+    return `Intentos: ${item.attempts_allowed}`;
+  }
+
+  formatTimeLimit(item: MoodleGradeItem): string {
+    if (!item.time_limit_minutes) {
+      return 'Tiempo: -';
+    }
+    return `Tiempo: ${item.time_limit_minutes} min`;
+  }
 }

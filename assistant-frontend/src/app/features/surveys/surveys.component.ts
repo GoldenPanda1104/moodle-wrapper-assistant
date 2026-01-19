@@ -32,6 +32,14 @@ export class SurveysComponent {
     this.loadSurveys();
   }
 
+  completeAllSurveys(): void {
+    for (const survey of this.surveys) {
+      if (!survey.completed_at) {
+        this.completeSurvey(survey);
+      }
+    }
+  }
+
   completeSurvey(survey: MoodleSurvey): void {
     if (this.completing.has(survey.id)) {
       return;
@@ -50,7 +58,10 @@ export class SurveysComponent {
         },
         error: () => {
           this.completing.delete(survey.id);
-          this.completionErrors.set(survey.id, 'No se pudo completar la encuesta.');
+          this.completionErrors.set(
+            survey.id,
+            'No se pudo completar la encuesta.',
+          );
         },
       });
   }

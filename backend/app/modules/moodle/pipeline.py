@@ -8,8 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.event_types import EventType
 from app.modules.moodle.client import build_client_from_settings
 from app.modules.moodle.diff import diff_snapshots
-from app.modules.moodle.scraper import scrape
+from app.modules.moodle.scraper import (
+    enrich_modules_with_surveys,
+    scrape,
+    scrape_grade_items,
+    scrape_modules,
+)
 from app.modules.moodle.snapshot import get_last_snapshot, save_snapshot
+from app.modules.moodle.models import MoodleModule
 from app.crud import moodle as crud_moodle
 from app.schemas.task import TaskCreate
 from app.services.event_service import log_event
@@ -92,7 +98,101 @@ async def async_run_pipeline(db: Session) -> None:
         await client.close()
 
 
+async def async_run_courses_pipeline(db: Session) -> None:
+    logger = logging.getLogger("moodle")
+    client = build_client_from_settings()
+    await client.login()
+    try:
+        courses = await client.get_courses()
+        course_map = crud_moodle.upsert_courses(db, courses)
+        logger.info("[Moodle] Cursos actualizados: %s", len(course_map))
+    finally:
+        await client.close()
+
+
+async def async_run_modules_pipeline(db: Session) -> None:
+    logger = logging.getLogger("moodle")
+    client = build_client_from_settings()
+    await client.login()
+    try:
+        course_map = await _load_or_sync_courses(db, client)
+        course_ids = [course.external_id for course in course_map.values()]
+        modules = await scrape_modules(client, course_ids)
+        crud_moodle.upsert_modules(db, [module.__dict__ for module in modules], course_map)
+        logger.info("[Moodle] Modulos actualizados: %s", len(modules))
+    finally:
+        await client.close()
+
+
+async def async_run_surveys_pipeline(db: Session) -> None:
+    logger = logging.getLogger("moodle")
+    client = build_client_from_settings()
+    await client.login()
+    try:
+        modules = crud_moodle.list_modules(db, limit=5000)
+        module_models = [
+            MoodleModule(
+                id=module.external_id,
+                course_id=module.course.external_id,
+                title=module.title,
+                visible=module.visible,
+                blocked=module.blocked,
+                block_reason=module.block_reason,
+                has_survey=module.has_survey,
+                url=module.url,
+            )
+            for module in modules
+        ]
+        updated_modules, surveys = await enrich_modules_with_surveys(client, module_models)
+        course_map = await _load_or_sync_courses(db, client)
+        module_map = crud_moodle.upsert_modules(
+            db, [module.__dict__ for module in updated_modules], course_map
+        )
+        crud_moodle.upsert_module_surveys(db, [survey.__dict__ for survey in surveys], module_map)
+        logger.info("[Moodle] Encuestas actualizadas: %s", len(surveys))
+    finally:
+        await client.close()
+
+
+async def async_run_grades_pipeline(db: Session) -> None:
+    logger = logging.getLogger("moodle")
+    client = build_client_from_settings()
+    await client.login()
+    try:
+        course_map = await _load_or_sync_courses(db, client)
+        course_ids = [course.external_id for course in course_map.values()]
+        grade_items = await scrape_grade_items(client, course_ids)
+        crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+        logger.info("[Moodle] Calificaciones actualizadas: %s", len(grade_items))
+    finally:
+        await client.close()
+
+
+async def async_run_quizzes_pipeline(db: Session) -> None:
+    logger = logging.getLogger("moodle")
+    client = build_client_from_settings()
+    await client.login()
+    try:
+        course_map = await _load_or_sync_courses(db, client)
+        course_ids = [course.external_id for course in course_map.values()]
+        grade_items = await scrape_grade_items(client, course_ids, item_type_filter={"quiz"})
+        crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+        logger.info("[Moodle] Cuestionarios actualizados: %s", len(grade_items))
+    finally:
+        await client.close()
+
+
 def run_pipeline(db: Session) -> None:
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
     asyncio.run(async_run_pipeline(db))
+
+
+async def _load_or_sync_courses(db: Session, client) -> dict[str, MoodleCourse]:
+    courses = crud_moodle.list_courses(db, limit=2000)
+    if courses:
+        return {course.external_id: course for course in courses}
+    course_rows = await client.get_courses()
+    if not course_rows:
+        return {}
+    return crud_moodle.upsert_courses(db, course_rows)

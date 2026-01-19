@@ -44,3 +44,5 @@ class MoodleGradeItem:
     submission_status: Optional[str]
     grading_status: Optional[str]
     last_submission_at: Optional[str]
+    attempts_allowed: Optional[int]
+    time_limit_minutes: Optional[int]

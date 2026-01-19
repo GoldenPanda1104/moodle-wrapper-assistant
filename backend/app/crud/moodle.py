@@ -280,6 +280,8 @@ def upsert_grade_items(
         available_at = _coerce_datetime(item.get("available_at"))
         due_at = _coerce_datetime(item.get("due_at"))
         last_submission_at = _coerce_datetime(item.get("last_submission_at"))
+        attempts_allowed = _coerce_int(item.get("attempts_allowed"))
+        time_limit_minutes = _coerce_int(item.get("time_limit_minutes"))
         if stored:
             stored.title = item["title"]
             stored.item_type = item["item_type"]
@@ -291,6 +293,8 @@ def upsert_grade_items(
             stored.submission_status = item.get("submission_status")
             stored.grading_status = item.get("grading_status")
             stored.last_submission_at = last_submission_at
+            stored.attempts_allowed = attempts_allowed
+            stored.time_limit_minutes = time_limit_minutes
             stored.last_seen_at = now
         else:
             stored = MoodleGradeItem(
@@ -306,6 +310,8 @@ def upsert_grade_items(
                 submission_status=item.get("submission_status"),
                 grading_status=item.get("grading_status"),
                 last_submission_at=last_submission_at,
+                attempts_allowed=attempts_allowed,
+                time_limit_minutes=time_limit_minutes,
                 last_seen_at=now,
             )
             db.add(stored)
@@ -320,5 +326,16 @@ def _coerce_datetime(value: str | datetime | None) -> datetime | None:
         return value
     try:
         return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _coerce_int(value: int | str | None) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
     except ValueError:
         return None

@@ -34,6 +34,7 @@ export class DashboardComponent {
   blockedTasks: Task[] = [];
   pendingSurveys: MoodleSurvey[] = [];
   pendingAssignments: MoodleGradeItem[] = [];
+  pendingQuizzes: MoodleGradeItem[] = [];
   recentEvents: EventLog[] = [];
   pipelineLogs: PipelineEvent[] = [];
   pipelineRunId: string | null = null;
@@ -109,14 +110,46 @@ export class DashboardComponent {
             .filter((survey) => !survey.completed_at)
             .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
             .slice(0, 6);
+          const now = new Date();
+          const cutoff = new Date(now);
+          cutoff.setDate(cutoff.getDate() + 7);
           this.pendingAssignments = grades
             .filter((item) => {
-              if (item.submission_status) {
-                return !item.submission_status.toLowerCase().includes('enviado');
+              if (item.item_type !== 'assignment') {
+                return false;
               }
-              return item.grade_value === null;
+              const status = item.submission_status?.toLowerCase() ?? '';
+              const notSubmitted = !status.includes('enviado');
+              const dueDate = item.due_at ? new Date(item.due_at) : null;
+              const withinWindow = dueDate ? dueDate <= cutoff : true;
+              return notSubmitted && withinWindow;
             })
-            .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
+            .sort((a, b) => {
+              const aDue = a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+              const bDue = b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+              if (aDue !== bDue) {
+                return aDue - bDue;
+              }
+              return b.last_seen_at.localeCompare(a.last_seen_at);
+            })
+            .slice(0, 6);
+          this.pendingQuizzes = grades
+            .filter((item) => {
+              if (item.item_type !== 'quiz') {
+                return false;
+              }
+              const dueDate = item.due_at ? new Date(item.due_at) : null;
+              const withinWindow = dueDate ? dueDate <= cutoff : true;
+              return item.grade_value === null && withinWindow;
+            })
+            .sort((a, b) => {
+              const aDue = a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+              const bDue = b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER;
+              if (aDue !== bDue) {
+                return aDue - bDue;
+              }
+              return b.last_seen_at.localeCompare(a.last_seen_at);
+            })
             .slice(0, 6);
           this.isLoading = false;
           this.isRefreshing = false;

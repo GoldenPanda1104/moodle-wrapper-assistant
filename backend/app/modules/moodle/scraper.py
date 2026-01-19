@@ -56,6 +56,31 @@ async def scrape(client: MoodleClient) -> dict:
     return data
 
 
+async def scrape_grade_items(
+    client: MoodleClient,
+    course_ids: list[str],
+    item_type_filter: set[str] | None = None,
+) -> list[MoodleGradeItem]:
+    items: list[MoodleGradeItem] = []
+    for course_id in course_ids:
+        items.extend(await _extract_grade_items(client, course_id, item_type_filter=item_type_filter))
+    return items
+
+
+async def scrape_modules(client: MoodleClient, course_ids: list[str]) -> list[MoodleModule]:
+    modules: list[MoodleModule] = []
+    for course_id in course_ids:
+        page = await client.get_course_page(course_id)
+        modules.extend(await _extract_modules(page, course_id))
+    return modules
+
+
+async def enrich_modules_with_surveys(
+    client: MoodleClient, modules: list[MoodleModule]
+) -> tuple[list[MoodleModule], list[MoodleModuleSurvey]]:
+    return await _enrich_modules_with_surveys(client, modules)
+
+
 async def _extract_modules(page: Page, course_id: str) -> list[MoodleModule]:
     modules = await _extract_modules_from_courseindex(page, course_id)
     if modules:
@@ -63,7 +88,11 @@ async def _extract_modules(page: Page, course_id: str) -> list[MoodleModule]:
     return await _extract_modules_from_activity_list(page, course_id)
 
 
-async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[MoodleGradeItem]:
+async def _extract_grade_items(
+    client: MoodleClient,
+    course_id: str,
+    item_type_filter: set[str] | None = None,
+) -> list[MoodleGradeItem]:
     items: list[MoodleGradeItem] = []
     page = await client.get_page(f"{client.base_url}/grade/report/user/index.php?id={course_id}")
     try:
@@ -90,9 +119,12 @@ async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[Moo
             if await icon.count() > 0:
                 item_type_label = _normalize_text((await icon.get_attribute("alt")) or "")
         item_type = _map_grade_item_type(item_type_label)
-        if item_type != "assignment":
+        if not item_type and url:
+            item_type = _map_grade_item_type_from_url(url)
+        if item_type_filter and item_type not in item_type_filter:
             continue
-
+        if not item_type:
+            continue
         grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade div.d-flex > div:first-child"))
         if not grade_display:
             grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade"))
@@ -105,6 +137,8 @@ async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[Moo
         submission_status = None
         grading_status = None
         last_submission_at = None
+        attempts_allowed = None
+        time_limit_minutes = None
         if url and "mod/assign/view.php" in url:
             details = await _extract_assignment_details(client, url)
             available_at = details.get("available_at")
@@ -112,6 +146,12 @@ async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[Moo
             submission_status = details.get("submission_status")
             grading_status = details.get("grading_status")
             last_submission_at = details.get("last_submission_at")
+        elif url and "mod/quiz/view.php" in url:
+            details = await _extract_quiz_details(client, url)
+            available_at = details.get("available_at")
+            due_at = details.get("due_at")
+            attempts_allowed = details.get("attempts_allowed")
+            time_limit_minutes = details.get("time_limit_minutes")
 
         items.append(
             MoodleGradeItem(
@@ -127,6 +167,8 @@ async def _extract_grade_items(client: MoodleClient, course_id: str) -> list[Moo
                 submission_status=submission_status,
                 grading_status=grading_status,
                 last_submission_at=last_submission_at,
+                attempts_allowed=attempts_allowed,
+                time_limit_minutes=time_limit_minutes,
             )
         )
 
@@ -374,6 +416,15 @@ def _extract_activity_id_from_url(url: str) -> str | None:
     return url.split("id=")[-1].split("&")[0]
 
 
+def _map_grade_item_type_from_url(url: str) -> str | None:
+    normalized = _normalize_text(url).lower()
+    if "mod/assign" in normalized:
+        return "assignment"
+    if "mod/quiz" in normalized:
+        return "quiz"
+    return None
+
+
 async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[str, str | None]:
     details: dict[str, str | None] = {
         "available_at": None,
@@ -411,6 +462,41 @@ async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[st
                 details["last_submission_at"] = _format_datetime(_parse_spanish_datetime(value))
     except Exception as exc:
         logging.getLogger("moodle").warning("[Moodle] Assignment detail parse failed: %s", exc)
+    return details
+
+
+async def _extract_quiz_details(client: MoodleClient, url: str) -> dict[str, str | int | None]:
+    details: dict[str, str | int | None] = {
+        "available_at": None,
+        "due_at": None,
+        "attempts_allowed": None,
+        "time_limit_minutes": None,
+    }
+    try:
+        page = await client.get_page(url)
+        date_nodes = page.locator(".activity-dates div")
+        date_count = await date_nodes.count()
+        for idx in range(date_count):
+            text = _normalize_text((await date_nodes.nth(idx).text_content()) or "")
+            if not text:
+                continue
+            lowered = _normalize_for_compare(text)
+            if lowered.startswith("abrio") or lowered.startswith("abrió"):
+                details["available_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+            elif lowered.startswith("cierra") or lowered.startswith("cerró"):
+                details["due_at"] = _format_datetime(_parse_spanish_datetime(_split_after_label(text)))
+
+        info_nodes = page.locator(".quizinfo p")
+        info_count = await info_nodes.count()
+        for idx in range(info_count):
+            text = _normalize_text((await info_nodes.nth(idx).text_content()) or "")
+            normalized = _normalize_for_compare(text)
+            if "intentos permitidos" in normalized:
+                details["attempts_allowed"] = _parse_int_after_label(text)
+            elif "limite de tiempo" in normalized or "límite de tiempo" in normalized:
+                details["time_limit_minutes"] = _parse_duration_minutes(text)
+    except Exception as exc:
+        logging.getLogger("moodle").warning("[Moodle] Quiz detail parse failed: %s", exc)
     return details
 
 
@@ -466,3 +552,28 @@ def _format_datetime(value: datetime | None) -> str | None:
     if not value:
         return None
     return value.isoformat()
+
+
+def _parse_int_after_label(value: str) -> int | None:
+    if ":" in value:
+        value = value.split(":", 1)[1].strip()
+    match = re.search(r"(\\d+)", value)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _parse_duration_minutes(value: str) -> int | None:
+    if ":" in value:
+        value = value.split(":", 1)[1].strip()
+    match = re.search(r"(\\d+)", value)
+    if not match:
+        return None
+    amount = int(match.group(1))
+    normalized = _normalize_for_compare(value)
+    if "hora" in normalized:
+        return amount * 60
+    return amount

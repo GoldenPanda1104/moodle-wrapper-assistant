@@ -84,16 +84,34 @@
             </h2>
             <div class="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-500">
               <span class="rounded border border-slate-200 px-2 py-1">
-                {{ item.item_type === "assignment" ? "Tarea" : item.item_type }}
+                {{ formatItemType(item) }}
               </span>
               <span class="rounded border border-slate-200 px-2 py-1">
                 {{ formatGrade(item) }}
               </span>
-              <span class="rounded border border-slate-200 px-2 py-1">
+              <span
+                *ngIf="item.item_type === 'assignment'"
+                class="rounded border border-slate-200 px-2 py-1"
+              >
                 {{ formatStatus(item.submission_status) }}
               </span>
-              <span class="rounded border border-slate-200 px-2 py-1">
+              <span
+                *ngIf="item.item_type === 'assignment'"
+                class="rounded border border-slate-200 px-2 py-1"
+              >
                 {{ formatStatus(item.grading_status) }}
+              </span>
+              <span
+                *ngIf="item.item_type === 'quiz'"
+                class="rounded border border-slate-200 px-2 py-1"
+              >
+                {{ formatAttempts(item) }}
+              </span>
+              <span
+                *ngIf="item.item_type === 'quiz'"
+                class="rounded border border-slate-200 px-2 py-1"
+              >
+                {{ formatTimeLimit(item) }}
               </span>
             </div>
           </div>
