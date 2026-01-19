@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.db.session import SessionLocal
 from app.modules.moodle.complete import complete_survey as complete_moodle_survey
 from app.modules.moodle.client import build_client_from_settings
-from app.modules.moodle.scraper import scrape as moodle_scrape
+from app.modules.moodle.scraper import enrich_modules_with_surveys, scrape_modules
 from app.modules.moodle import pipeline as moodle_pipeline
 from app.schemas.moodle_course import MoodleCourseRead
 from app.schemas.moodle_module import MoodleModuleRead
@@ -22,6 +22,16 @@ from app.services.pipeline_stream import PipelineEvent, PipelineStreamManager
 
 router = APIRouter()
 pipeline_stream = PipelineStreamManager()
+
+
+async def _refresh_course_surveys(db: Session, client, course) -> None:
+    modules = await scrape_modules(client, [course.external_id])
+    if not modules:
+        return
+    updated_modules, surveys = await enrich_modules_with_surveys(client, modules)
+    course_map = {course.external_id: course}
+    module_map = crud_moodle.upsert_modules(db, [module.__dict__ for module in updated_modules], course_map)
+    crud_moodle.upsert_module_surveys(db, [survey.__dict__ for survey in surveys], module_map)
 
 
 @router.get("/courses", response_model=list[MoodleCourseRead])
@@ -129,13 +139,18 @@ async def complete_survey(survey_id: int, db: Session = Depends(get_db)):
 
 @router.post("/courses/{course_id}/surveys/complete-all")
 async def complete_course_surveys(course_id: int, db: Session = Depends(get_db)):
-    max_cycles = 5
+    course = crud_moodle.get_course(db, course_id=course_id)
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    max_cycles = 100
     attempted: set[int] = set()
     results: list[dict] = []
 
     client = build_client_from_settings()
     await client.login()
     try:
+        await _refresh_course_surveys(db, client, course)
         for _ in range(max_cycles):
             surveys = crud_moodle.list_module_surveys(db, course_id=course_id, limit=1000)
             pending = [
@@ -146,13 +161,15 @@ async def complete_course_surveys(course_id: int, db: Session = Depends(get_db))
             if not pending:
                 break
 
+            progress_made = False
             for survey in pending:
                 attempt = await complete_moodle_survey(survey.completion_url, client=client)
-                if attempt.get("submitted") or attempt.get("reason") in {
+                completed = attempt.get("submitted") or attempt.get("reason") in {
                     "completion_badge",
                     "completion_text",
                     "already_completed",
-                }:
+                }
+                if completed:
                     crud_moodle.mark_survey_completed(db, survey)
                 results.append(
                     {
@@ -164,15 +181,13 @@ async def complete_course_surveys(course_id: int, db: Session = Depends(get_db))
                 )
                 attempted.add(survey.id)
 
-                if attempt.get("submitted"):
-                    refresh_db = SessionLocal()
-                    try:
-                        data = await moodle_scrape(client)
-                        course_map = crud_moodle.upsert_courses(refresh_db, data.get("courses", []))
-                        module_map = crud_moodle.upsert_modules(refresh_db, data.get("modules", []), course_map)
-                        crud_moodle.upsert_module_surveys(refresh_db, data.get("module_surveys", []), module_map)
-                    finally:
-                        refresh_db.close()
+                if completed:
+                    await _refresh_course_surveys(db, client, course)
+                    progress_made = True
+                    break
+
+            if not progress_made:
+                break
         return {"detail": "Course surveys processed", "results": results}
     finally:
         await client.close()

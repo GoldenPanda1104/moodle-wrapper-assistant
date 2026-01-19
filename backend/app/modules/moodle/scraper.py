@@ -96,7 +96,13 @@ async def _extract_grade_items(
 ) -> list[MoodleGradeItem]:
     items: list[MoodleGradeItem] = []
     base_items: list[dict] = []
-    page = await client.get_page(f"{client.base_url}/grade/report/user/index.php?id={course_id}")
+    try:
+        page = await client.get_page(f"{client.base_url}/grade/report/user/index.php?id={course_id}")
+    except Exception as exc:
+        logging.getLogger("moodle").warning(
+            "[Moodle] Grade report load failed for course %s: %s", course_id, exc
+        )
+        return items
     try:
         await page.wait_for_selector("table.user-grade", timeout=5000)
     except Exception:
@@ -288,8 +294,14 @@ async def _enrich_modules_with_surveys(
     for module in modules:
         if not module.url or "course/section.php" not in module.url:
             continue
-        page = await client.get_page(module.url)
-        surveys = await _extract_module_surveys(page, module)
+        try:
+            page = await client.get_page(module.url)
+            surveys = await _extract_module_surveys(page, module)
+        except Exception as exc:
+            logging.getLogger("moodle").warning(
+                "[Moodle] Module survey load failed for %s: %s", module.url, exc
+            )
+            continue
         key = (module.course_id, module.id)
         has_survey_map[key] = bool(surveys)
         if surveys:
