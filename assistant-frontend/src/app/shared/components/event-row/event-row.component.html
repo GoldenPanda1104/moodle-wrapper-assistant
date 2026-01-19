@@ -1,0 +1,14 @@
+<div class="flex items-center justify-between gap-4 border-b border-slate-200 py-3">
+  <div class="flex items-center gap-3">
+    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">
+      *
+    </span>
+    <div>
+      <div class="text-sm font-semibold text-slate-900">{{ event.event_type }}</div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-500">{{ event.source }}</div>
+    </div>
+  </div>
+  <div class="text-[11px] uppercase tracking-wide text-slate-500">
+    {{ relativeTime }}
+  </div>
+</div>
