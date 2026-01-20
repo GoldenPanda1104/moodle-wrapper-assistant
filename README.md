@@ -1,6 +1,6 @@
-# Suantechs Study Assistant
+# Moodle Wrapper Assistant
 
-Suantechs Study Assistant is a web app that helps track and automate study workflows.
+Moodle Wrapper Assistant is a web app that helps track and automate study workflows.
 It includes a Python/FastAPI backend and a frontend client.
 
 ## Features
@@ -51,4 +51,3 @@ Licensed under the GNU Affero General Public License v3.0. See `LICENSE`.
 ## Contributing
 
 See `CONTRIBUTING.md`.
-

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Suantechs Assistant"
+    PROJECT_NAME: str = "Moodle Wrapper"
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@db:5432/assistant"
     MOODLE_BASE_URL: str = ""
     MOODLE_USERNAME: str = ""
@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     APP_TIMEZONE: str = "America/Panama"
     MAILERSEND_API_KEY: str = ""
     MAILERSEND_FROM_EMAIL: str = ""
-    MAILERSEND_FROM_NAME: str = "Suantechs Assistant"
+    MAILERSEND_FROM_NAME: str = "Moodle Wrapper"
     MAILERSEND_TO_EMAIL: str = ""
     JWT_SECRET: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
