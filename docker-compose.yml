@@ -16,11 +16,11 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: ${{DATABASE_URL}}
-      PROJECT_NAME: ${{PROJECT_NAME}}
-      MOODLE_BASE_URL: ${{MOODLE_BASE_URL}}
-      SERVER_MASTER_KEY: ${{SERVER_MASTER_KEY}}
-      JWT_SECRET: ${{JWT_SECRET}}
+      DATABASE_URL: ${DATABASE_URL}
+      PROJECT_NAME: ${PROJECT_NAME}
+      MOODLE_BASE_URL: ${MOODLE_BASE_URL}
+      SERVER_MASTER_KEY: ${SERVER_MASTER_KEY}
+      JWT_SECRET: ${JWT_SECRET}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
