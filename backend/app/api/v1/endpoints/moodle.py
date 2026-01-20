@@ -10,9 +10,8 @@ from sqlalchemy.orm import Session
 from app.crud import moodle as crud_moodle
 from app.db.session import get_db
 from app.db.session import SessionLocal
+from app.modules.moodle.adapters import get_adapter
 from app.modules.moodle.complete import complete_survey as complete_moodle_survey
-from app.modules.moodle.client import build_client_from_credentials
-from app.modules.moodle.scraper import enrich_modules_with_surveys, scrape_modules
 from app.modules.moodle import pipeline as moodle_pipeline
 from app.schemas.moodle_course import MoodleCourseRead
 from app.schemas.moodle_module import MoodleModuleRead
@@ -29,7 +28,7 @@ router = APIRouter()
 pipeline_stream = PipelineStreamManager()
 
 
-def _build_client_from_vault(db: Session, user_id: int):
+def _build_adapter_from_vault(db: Session, user_id: int):
     vault = get_vault(db, user_id)
     if not vault or not vault.pipeline_key_wrapped_server or not vault.pipeline_key_wrapped_server_nonce:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vault credentials not available")
@@ -39,17 +38,21 @@ def _build_client_from_vault(db: Session, user_id: int):
     )
     creds_blob = decrypt_aes_gcm(pipeline_key, vault.credentials_nonce, vault.credentials_ciphertext)
     creds = jsonlib.loads(creds_blob.decode("utf-8"))
-    return build_client_from_credentials(creds.get("username", ""), creds.get("password", ""))
+    return get_adapter(creds)
 
 
-async def _refresh_course_surveys(db: Session, client, course) -> None:
-    modules = await scrape_modules(client, [course.external_id])
+async def _refresh_course_surveys(db: Session, adapter, course) -> None:
+    modules = await adapter.get_modules(course.external_id)
     if not modules:
         return
-    updated_modules, surveys = await enrich_modules_with_surveys(client, modules)
+    surveys = await adapter.get_surveys()
+    course_surveys = [survey for survey in surveys if survey.course_id == course.external_id]
+    updated_modules = _merge_survey_flags(modules, course_surveys)
     course_map = {course.external_id: course}
     module_map = crud_moodle.upsert_modules(db, [module.__dict__ for module in updated_modules], course_map)
-    crud_moodle.upsert_module_surveys(db, [survey.__dict__ for survey in surveys], module_map)
+    crud_moodle.upsert_module_surveys(
+        db, [survey.__dict__ for survey in course_surveys], module_map
+    )
 
 
 @router.get("/courses", response_model=list[MoodleCourseRead])
@@ -160,12 +163,12 @@ async def complete_survey(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Survey completion URL not available",
         )
-    client = _build_client_from_vault(db, current_user.id)
-    await client.login()
+    adapter = _build_adapter_from_vault(db, current_user.id)
+    await adapter.login()
     try:
-        result = await complete_moodle_survey(survey.completion_url, client=client)
+        result = await complete_moodle_survey(survey.completion_url, adapter=adapter)
     finally:
-        await client.close()
+        await adapter.close()
     if result.get("submitted") or result.get("reason") in {"completion_badge", "completion_text", "already_completed"}:
         crud_moodle.mark_survey_completed(db, survey)
     return {"detail": "Survey submission attempted", "result": result}
@@ -185,10 +188,10 @@ async def complete_course_surveys(
     attempted: set[int] = set()
     results: list[dict] = []
 
-    client = _build_client_from_vault(db, current_user.id)
-    await client.login()
+    adapter = _build_adapter_from_vault(db, current_user.id)
+    await adapter.login()
     try:
-        await _refresh_course_surveys(db, client, course)
+        await _refresh_course_surveys(db, adapter, course)
         for _ in range(max_cycles):
             surveys = crud_moodle.list_module_surveys(
                 db, user_id=current_user.id, course_id=course_id, limit=1000
@@ -203,7 +206,7 @@ async def complete_course_surveys(
 
             progress_made = False
             for survey in pending:
-                attempt = await complete_moodle_survey(survey.completion_url, client=client)
+                attempt = await complete_moodle_survey(survey.completion_url, adapter=adapter)
                 completed = attempt.get("submitted") or attempt.get("reason") in {
                     "completion_badge",
                     "completion_text",
@@ -222,7 +225,7 @@ async def complete_course_surveys(
                 attempted.add(survey.id)
 
                 if completed:
-                    await _refresh_course_surveys(db, client, course)
+                    await _refresh_course_surveys(db, adapter, course)
                     progress_made = True
                     break
 
@@ -230,7 +233,27 @@ async def complete_course_surveys(
                 break
         return {"detail": "Course surveys processed", "results": results}
     finally:
-        await client.close()
+        await adapter.close()
+
+
+def _merge_survey_flags(modules, surveys):
+    survey_map = {(survey.course_id, survey.module_id) for survey in surveys}
+    updated = []
+    for module in modules:
+        has_survey = (module.course_id, module.id) in survey_map
+        updated.append(
+            module.__class__(
+                id=module.id,
+                course_id=module.course_id,
+                title=module.title,
+                visible=module.visible,
+                blocked=module.blocked,
+                block_reason=module.block_reason,
+                has_survey=has_survey,
+                url=module.url,
+            )
+        )
+    return updated
 
 
 @router.post("/pipeline/run")

@@ -8,14 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.event_types import EventType
 import json
 
-from app.modules.moodle.client import build_client_from_credentials
+from app.modules.moodle.adapters import get_adapter
 from app.modules.moodle.diff import diff_snapshots
-from app.modules.moodle.scraper import (
-    enrich_modules_with_surveys,
-    scrape,
-    scrape_grade_items,
-    scrape_modules,
-)
 from app.modules.moodle.snapshot import get_last_snapshot, save_snapshot
 from app.modules.moodle.models import MoodleModule
 from app.models.moodle_course import MoodleCourse
@@ -86,55 +80,69 @@ def _handle_diff(db: Session, diff: dict, user_id: int) -> None:
 
 async def async_run_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
-        data = await scrape(client)
-        course_map = crud_moodle.upsert_courses(db, user_id, data.get("courses", []))
-        module_map = crud_moodle.upsert_modules(db, data.get("modules", []), course_map)
-        crud_moodle.upsert_module_surveys(db, data.get("module_surveys", []), module_map)
-        crud_moodle.upsert_grade_items(db, data.get("grade_items", []), course_map)
+        courses = await adapter.get_courses()
+        modules = await _fetch_modules(adapter, courses)
+        surveys = await adapter.get_surveys()
+        modules = _merge_survey_flags(modules, surveys)
+        grade_items = await adapter.get_grades()
+
+        course_map = crud_moodle.upsert_courses(db, user_id, [course.__dict__ for course in courses])
+        module_map = crud_moodle.upsert_modules(db, [module.__dict__ for module in modules], course_map)
+        crud_moodle.upsert_module_surveys(
+            db, [survey.__dict__ for survey in surveys], module_map
+        )
+        crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+
         previous = get_last_snapshot(user_id)
-        diffs = diff_snapshots(previous.data if previous else None, data)
-        save_snapshot(user_id, data)
+        snapshot = {
+            "courses": [course.__dict__ for course in courses],
+            "modules": [module.__dict__ for module in modules],
+            "module_surveys": [survey.__dict__ for survey in surveys],
+            "grade_items": [item.__dict__ for item in grade_items],
+        }
+        diffs = diff_snapshots(previous.data if previous else None, snapshot)
+        save_snapshot(user_id, snapshot)
 
         logger.info("[Moodle] Diffs detectados: %s", len(diffs))
         for diff in diffs:
             _handle_diff(db, diff, user_id)
     finally:
-        await client.close()
+        await adapter.close()
 
 
 async def async_run_courses_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
-        courses = await client.get_courses()
-        course_map = crud_moodle.upsert_courses(db, user_id, courses)
+        courses = await adapter.get_courses()
+        course_map = crud_moodle.upsert_courses(db, user_id, [course.__dict__ for course in courses])
         logger.info("[Moodle] Cursos actualizados: %s", len(course_map))
     finally:
-        await client.close()
+        await adapter.close()
 
 
 async def async_run_modules_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
-        course_map = await _load_or_sync_courses(db, user_id, client)
+        course_map = await _load_or_sync_courses(db, user_id, adapter)
         course_ids = [course.external_id for course in course_map.values()]
-        modules = await scrape_modules(client, course_ids)
+        modules = await _fetch_modules_by_ids(adapter, course_ids)
         crud_moodle.upsert_modules(db, [module.__dict__ for module in modules], course_map)
         logger.info("[Moodle] Modulos actualizados: %s", len(modules))
     finally:
-        await client.close()
+        await adapter.close()
 
 
 async def async_run_surveys_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
         modules = crud_moodle.list_modules(db, user_id, limit=5000)
         module_models = [
@@ -150,43 +158,42 @@ async def async_run_surveys_pipeline(db: Session, user_id: int) -> None:
             )
             for module in modules
         ]
-        updated_modules, surveys = await enrich_modules_with_surveys(client, module_models)
-        course_map = await _load_or_sync_courses(db, user_id, client)
+        surveys = await adapter.get_surveys()
+        updated_modules = _merge_survey_flags(module_models, surveys)
+        course_map = await _load_or_sync_courses(db, user_id, adapter)
         module_map = crud_moodle.upsert_modules(
             db, [module.__dict__ for module in updated_modules], course_map
         )
         crud_moodle.upsert_module_surveys(db, [survey.__dict__ for survey in surveys], module_map)
         logger.info("[Moodle] Encuestas actualizadas: %s", len(surveys))
     finally:
-        await client.close()
+        await adapter.close()
 
 
 async def async_run_grades_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
-        course_map = await _load_or_sync_courses(db, user_id, client)
-        course_ids = [course.external_id for course in course_map.values()]
-        grade_items = await scrape_grade_items(client, course_ids)
+        course_map = await _load_or_sync_courses(db, user_id, adapter)
+        grade_items = await adapter.get_grades()
         crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
         logger.info("[Moodle] Calificaciones actualizadas: %s", len(grade_items))
     finally:
-        await client.close()
+        await adapter.close()
 
 
 async def async_run_quizzes_pipeline(db: Session, user_id: int) -> None:
     logger = logging.getLogger("moodle")
-    client = await _build_client_from_vault(db, user_id)
-    await client.login()
+    adapter = await _build_adapter_from_vault(db, user_id)
+    await adapter.login()
     try:
-        course_map = await _load_or_sync_courses(db, user_id, client)
-        course_ids = [course.external_id for course in course_map.values()]
-        grade_items = await scrape_grade_items(client, course_ids, item_type_filter={"quiz"})
+        course_map = await _load_or_sync_courses(db, user_id, adapter)
+        grade_items = await adapter.get_quizzes()
         crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
         logger.info("[Moodle] Cuestionarios actualizados: %s", len(grade_items))
     finally:
-        await client.close()
+        await adapter.close()
 
 
 def run_pipeline(db: Session, user_id: int) -> None:
@@ -195,17 +202,19 @@ def run_pipeline(db: Session, user_id: int) -> None:
     asyncio.run(async_run_pipeline(db, user_id))
 
 
-async def _load_or_sync_courses(db: Session, user_id: int, client) -> dict[str, MoodleCourse]:
+async def _load_or_sync_courses(db: Session, user_id: int, adapter) -> dict[str, MoodleCourse]:
     courses = crud_moodle.list_courses(db, user_id=user_id, limit=2000)
     if courses:
         return {course.external_id: course for course in courses}
-    course_rows = await client.get_courses()
+    course_rows = await adapter.get_courses()
     if not course_rows:
         return {}
-    return crud_moodle.upsert_courses(db, user_id, course_rows)
+    return crud_moodle.upsert_courses(
+        db, user_id, [course.__dict__ for course in course_rows]
+    )
 
 
-async def _build_client_from_vault(db: Session, user_id: int):
+async def _build_adapter_from_vault(db: Session, user_id: int):
     vault = get_vault(db, user_id)
     if not vault or not vault.pipeline_key_wrapped_server or not vault.pipeline_key_wrapped_server_nonce:
         raise RuntimeError("No cron credentials available for this user.")
@@ -215,4 +224,40 @@ async def _build_client_from_vault(db: Session, user_id: int):
     )
     creds_blob = decrypt_aes_gcm(pipeline_key, vault.credentials_nonce, vault.credentials_ciphertext)
     creds = json.loads(creds_blob.decode("utf-8"))
-    return build_client_from_credentials(creds.get("username", ""), creds.get("password", ""))
+    return get_adapter(creds)
+
+
+async def _fetch_modules(adapter, courses: list) -> list[MoodleModule]:
+    modules: list[MoodleModule] = []
+    for course in courses:
+        modules.extend(await adapter.get_modules(course.id))
+    return modules
+
+
+async def _fetch_modules_by_ids(adapter, course_ids: list[str]) -> list[MoodleModule]:
+    modules: list[MoodleModule] = []
+    for course_id in course_ids:
+        modules.extend(await adapter.get_modules(course_id))
+    return modules
+
+
+def _merge_survey_flags(
+    modules: list[MoodleModule], surveys: list
+) -> list[MoodleModule]:
+    survey_map = {(survey.course_id, survey.module_id) for survey in surveys}
+    updated: list[MoodleModule] = []
+    for module in modules:
+        has_survey = (module.course_id, module.id) in survey_map
+        updated.append(
+            MoodleModule(
+                id=module.id,
+                course_id=module.course_id,
+                title=module.title,
+                visible=module.visible,
+                blocked=module.blocked,
+                block_reason=module.block_reason,
+                has_survey=has_survey,
+                url=module.url,
+            )
+        )
+    return updated

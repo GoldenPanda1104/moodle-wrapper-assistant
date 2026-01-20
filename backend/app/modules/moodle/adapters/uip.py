@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import asyncio
@@ -6,8 +7,14 @@ import re
 import unicodedata
 from dataclasses import asdict
 from datetime import datetime, timezone
+from typing import Optional
+from urllib.parse import parse_qs, urlparse
 
 import dateparser
+from playwright.async_api import Locator, Page
+
+from app.core.config import settings
+from app.modules.moodle.adapters.base import MoodleAdapter
 from app.modules.moodle.client import MoodleClient
 from app.modules.moodle.models import (
     MoodleCourse,
@@ -15,49 +22,215 @@ from app.modules.moodle.models import (
     MoodleModule,
     MoodleModuleSurvey,
 )
-from playwright.async_api import Locator, Page
 
 
-async def scrape(client: MoodleClient) -> dict:
-    logger = logging.getLogger("moodle")
-    courses: list[MoodleCourse] = []
-    modules: list[MoodleModule] = []
-    module_surveys: list[MoodleModuleSurvey] = []
-    grade_items: list[MoodleGradeItem] = []
+class UIPMoodleAdapter(MoodleAdapter):
+    def __init__(self, username: str, password: str, base_url: Optional[str] = None):
+        self._client = MoodleClient(base_url or settings.MOODLE_BASE_URL, username, password)
+        self._logger = logging.getLogger("moodle")
+        self._logged_in = False
+        self._courses_cache: list[MoodleCourse] | None = None
+        self._modules_cache: dict[str, list[MoodleModule]] = {}
 
-    for attempt in range(3):
-        try:
-            course_rows = await client.get_courses()
-            logger.info("[Moodle] Cursos detectados: %s", len(course_rows))
-            for course in course_rows:
-                courses.append(MoodleCourse(id=course["id"], name=course["name"]))
-                page = await client.get_course_page(course["id"])
-                modules.extend(await _extract_modules(page, course["id"]))
-                grade_items.extend(await _extract_grade_items(client, course["id"]))
+    async def login(self) -> None:
+        if self._logged_in:
+            return
+        if not self._client.base_url or not self._client.username or not self._client.password:
+            raise ValueError("Missing Moodle credentials or base URL.")
 
-            modules, module_surveys = await _enrich_modules_with_surveys(client, modules)
+        for attempt in range(3):
+            try:
+                page = await self._client.open()
 
-            logger.info("[Moodle] Modulos detectados: %s", len(modules))
-            logger.info("[Moodle] Encuestas detectadas: %s", len(module_surveys))
-            logger.info("[Moodle] Calificaciones detectadas: %s", len(grade_items))
-            break
-        except Exception as exc:
-            logger.warning("[Moodle] Scrape attempt %s failed: %s", attempt + 1, exc)
-            if attempt < 2:
-                await asyncio.sleep(2)
-            else:
-                raise
+                await page.goto(self._client.base_url, wait_until="domcontentloaded", timeout=30000)
 
-    data = {
-        "courses": [asdict(course) for course in courses],
-        "modules": [asdict(module) for module in modules],
-        "module_surveys": [asdict(survey) for survey in module_surveys],
-        "grade_items": [asdict(item) for item in grade_items],
-    }
-    return data
+                if await page.locator("body#page-my-index").count() == 0:
+                    login_form = page.locator("input[name='username']")
+                    if await login_form.count() > 0:
+                        await page.fill("input[name='username']", self._client.username)
+                        await page.fill("input[name='password']", self._client.password)
+                await page.click("button[type='submit']")
+                await page.wait_for_timeout(1500)
+
+                await page.goto(
+                    f"{self._client.base_url}/my/",
+                    wait_until="domcontentloaded",
+                    timeout=30000,
+                )
+                await page.wait_for_timeout(1500)
+                has_dashboard = await page.locator("body#page-my-index").count() > 0
+                has_user_menu = await page.locator("#user-menu-toggle").count() > 0
+                has_logout = await page.locator("a[href*='logout']").count() > 0
+                has_loggedin_body = await page.locator("body.loggedin").count() > 0
+                has_userid = await page.locator("[data-userid]").count() > 0
+
+                if not (has_dashboard or has_user_menu or has_logout or has_loggedin_body or has_userid):
+                    await page.goto(self._client.base_url, wait_until="domcontentloaded", timeout=30000)
+                    await page.wait_for_timeout(1000)
+                    has_user_menu = await page.locator("#user-menu-toggle").count() > 0
+                    has_logout = await page.locator("a[href*='logout']").count() > 0
+                    has_loggedin_body = await page.locator("body.loggedin").count() > 0
+                    has_userid = await page.locator("[data-userid]").count() > 0
+                    if not (has_user_menu or has_logout or has_loggedin_body or has_userid):
+                        raise RuntimeError("Login failed or dashboard not detected.")
+
+                self._logger.info("[Moodle] Login OK")
+                self._logged_in = True
+                return
+            except Exception as exc:
+                self._logger.warning("[Moodle] Login attempt %s failed: %s", attempt + 1, exc)
+                await self._client.close()
+                if attempt < 2:
+                    await asyncio.sleep(2)
+                else:
+                    raise
+    async def close(self) -> None:
+        await self._client.close()
+        self._logged_in = False
+        self._courses_cache = None
+        self._modules_cache = {}
+
+    async def get_courses(self) -> list[MoodleCourse]:
+        await self.login()
+        if self._courses_cache is not None:
+            return list(self._courses_cache)
+
+        for attempt in range(3):
+            try:
+                page = await self._client.get_page(f"{self._client.base_url}/my/")
+                course_cards = page.locator("[data-region='course-content'][data-course-id]")
+                if await course_cards.count() == 0:
+                    try:
+                        await page.wait_for_selector(
+                            "[data-region='course-content'][data-course-id]",
+                            timeout=5000,
+                        )
+                        course_cards = page.locator("[data-region='course-content'][data-course-id]")
+                    except Exception:
+                        page = await self._client.get_page(f"{self._client.base_url}/my/courses.php")
+                        course_cards = page.locator("[data-region='course-content'][data-course-id]")
+                count = await course_cards.count()
+
+                courses: dict[str, MoodleCourse] = {}
+                for idx in range(count):
+                    card = course_cards.nth(idx)
+                    course_id = await card.get_attribute("data-course-id")
+                    if not course_id:
+                        continue
+                    link = card.locator("a.coursename").first
+                    href = await link.get_attribute("href")
+                    name = await _extract_course_name(link)
+                    if not name:
+                        name = f"Course {course_id}"
+                    if href:
+                        courses[course_id] = MoodleCourse(id=course_id, name=name)
+
+                if not courses:
+                    links = page.locator("a[href*='course/view.php?id=']")
+                    link_count = await links.count()
+                    for idx in range(link_count):
+                        link = links.nth(idx)
+                        href = await link.get_attribute("href") or ""
+                        course_id = _extract_course_id(href)
+                        if not course_id:
+                            continue
+                        name = await _extract_course_name(link)
+                        if not name:
+                            name = f"Course {course_id}"
+                        courses[course_id] = MoodleCourse(id=course_id, name=name)
+
+                self._courses_cache = list(courses.values())
+                return list(self._courses_cache)
+            except Exception as exc:
+                self._logger.warning("[Moodle] Get courses attempt %s failed: %s", attempt + 1, exc)
+                if attempt < 2:
+                    await asyncio.sleep(2)
+                else:
+                    raise
+
+    async def get_modules(self, course_id: str) -> list[MoodleModule]:
+        await self.login()
+        if course_id in self._modules_cache:
+            return list(self._modules_cache[course_id])
+        page = await self._client.get_page(f"{self._client.base_url}/course/view.php?id={course_id}")
+        modules = await _extract_modules(page, course_id)
+        self._modules_cache[course_id] = modules
+        return list(modules)
+
+    async def get_grades(self) -> list[MoodleGradeItem]:
+        await self.login()
+        courses = await self.get_courses()
+        course_ids = [course.id for course in courses]
+        return await _fetch_grade_items(self._client, course_ids)
+
+    async def get_quizzes(self) -> list[MoodleGradeItem]:
+        await self.login()
+        courses = await self.get_courses()
+        course_ids = [course.id for course in courses]
+        return await _fetch_grade_items(self._client, course_ids, item_type_filter={"quiz"})
+
+    async def get_surveys(self) -> list[MoodleModuleSurvey]:
+        await self.login()
+        courses = await self.get_courses()
+        modules: list[MoodleModule] = []
+        for course in courses:
+            modules.extend(await self.get_modules(course.id))
+        updated_modules, surveys = await _enrich_modules_with_surveys(self._client, modules)
+        self._update_module_cache(updated_modules)
+        return surveys
+
+    async def complete_survey(self, completion_url: str) -> dict:
+        await self.login()
+        page = await self._client.get_page(completion_url)
+        form_found, reason = await _fill_feedback_form(page)
+        if not form_found:
+            return {
+                "submitted": False,
+                "url": page.url,
+                "reason": reason or "form_not_found",
+            }
+
+        submit = page.locator("form#feedback_complete_form input[type='submit'][name='savevalues']").first
+        if await submit.count() == 0:
+            completed, completion_reason = await _detect_completion_status(page)
+            if completed is True:
+                return {
+                    "submitted": True,
+                    "url": page.url,
+                    "reason": completion_reason or "already_completed",
+                }
+            return {
+                "submitted": True,
+                "url": page.url,
+                "reason": completion_reason or "submit_not_found_assumed_complete",
+            }
+
+        await submit.click()
+        await page.wait_for_load_state("domcontentloaded")
+        await page.wait_for_timeout(1000)
+
+        form_present = await page.locator("form#feedback_complete_form").count() > 0
+        if not form_present:
+            result = {"submitted": True, "url": page.url}
+        else:
+            completed, completion_reason = await _detect_completion_status(page)
+            result = {
+                "submitted": bool(completed),
+                "url": page.url,
+                "reason": completion_reason or "submit_unknown",
+            }
+        self._logger.info("[Moodle] Survey completion result: %s", result)
+        return result
+
+    def _update_module_cache(self, modules: list[MoodleModule]) -> None:
+        grouped: dict[str, list[MoodleModule]] = {}
+        for module in modules:
+            grouped.setdefault(module.course_id, []).append(module)
+        for course_id, course_modules in grouped.items():
+            self._modules_cache[course_id] = course_modules
 
 
-async def scrape_grade_items(
+async def _fetch_grade_items(
     client: MoodleClient,
     course_ids: list[str],
     item_type_filter: set[str] | None = None,
@@ -68,26 +241,11 @@ async def scrape_grade_items(
     return items
 
 
-async def scrape_modules(client: MoodleClient, course_ids: list[str]) -> list[MoodleModule]:
-    modules: list[MoodleModule] = []
-    for course_id in course_ids:
-        page = await client.get_course_page(course_id)
-        modules.extend(await _extract_modules(page, course_id))
-    return modules
-
-
-async def enrich_modules_with_surveys(
-    client: MoodleClient, modules: list[MoodleModule]
-) -> tuple[list[MoodleModule], list[MoodleModuleSurvey]]:
-    return await _enrich_modules_with_surveys(client, modules)
-
-
 async def _extract_modules(page: Page, course_id: str) -> list[MoodleModule]:
     modules = await _extract_modules_from_courseindex(page, course_id)
     if modules:
         return modules
     return await _extract_modules_from_activity_list(page, course_id)
-
 
 async def _extract_grade_items(
     client: MoodleClient,
@@ -135,7 +293,9 @@ async def _extract_grade_items(
             continue
         if not item_type:
             continue
-        grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade div.d-flex > div:first-child"))
+        grade_display = _normalize_text(
+            await _text_or_empty(row, "td.column-grade div.d-flex > div:first-child")
+        )
         if not grade_display:
             grade_display = _normalize_text(await _text_or_empty(row, "td.column-grade"))
         grade_value = _parse_grade_value(grade_display)
@@ -235,8 +395,9 @@ async def _extract_modules_from_courseindex(page: Page, course_id: str) -> list[
             )
         )
 
-        #log modules
-        logging.getLogger("moodle").debug("[Moodle] Course %s module detected: %s", course_id, asdict(modules[-1]))
+        logging.getLogger("moodle").debug(
+            "[Moodle] Course %s module detected: %s", course_id, asdict(modules[-1])
+        )
 
     return modules
 
@@ -282,7 +443,6 @@ async def _extract_modules_from_activity_list(page: Page, course_id: str) -> lis
 
     return modules
 
-
 async def _enrich_modules_with_surveys(
     client: MoodleClient, modules: list[MoodleModule]
 ) -> tuple[list[MoodleModule], list[MoodleModuleSurvey]]:
@@ -296,7 +456,7 @@ async def _enrich_modules_with_surveys(
             continue
         try:
             page = await client.get_page(module.url)
-            surveys = await _extract_module_surveys(page, module)
+            surveys = await _extract_module_surveys(page, module, client.base_url)
         except Exception as exc:
             logging.getLogger("moodle").warning(
                 "[Moodle] Module survey load failed for %s: %s", module.url, exc
@@ -333,14 +493,7 @@ async def _text_or_empty(scope: Locator, selector: str) -> str:
     return (await node.text_content()) or ""
 
 
-async def _extract_activity_id(activity: Locator, fallback_idx: int) -> str:
-    href = await activity.locator("a[href*='mod/']").first.get_attribute("href")
-    if href and "id=" in href:
-        return href.split("id=")[-1].split("&")[0]
-    return f"activity-{fallback_idx + 1}"
-
-
-async def _has_survey(activity) -> bool:
+async def _has_survey(activity: Locator) -> bool:
     class_attr = (await activity.get_attribute("class")) or ""
     if "modtype_feedback" not in class_attr and "modtype_survey" not in class_attr:
         return False
@@ -351,7 +504,7 @@ async def _has_survey(activity) -> bool:
 
 
 async def _extract_module_surveys(
-    page: Page, module: MoodleModule
+    page: Page, module: MoodleModule, base_url: str
 ) -> list[MoodleModuleSurvey]:
     surveys: list[MoodleModuleSurvey] = []
     activity_nodes = page.locator("li.activity-wrapper")
@@ -382,7 +535,7 @@ async def _extract_module_surveys(
         completion_url = None
         if activity_id.isdigit() and module.course_id.isdigit():
             completion_url = (
-                "https://moodle.uip.edu.pa/mod/feedback/complete.php"
+                f"{base_url.rstrip('/')}/mod/feedback/complete.php"
                 f"?id={activity_id}&courseid={module.course_id}"
             )
 
@@ -453,7 +606,6 @@ def _map_grade_item_type_from_url(url: str) -> str | None:
     if "mod/quiz" in normalized:
         return "quiz"
     return None
-
 
 async def _extract_assignment_details(client: MoodleClient, url: str) -> dict[str, str | None]:
     details: dict[str, str | None] = {
@@ -607,11 +759,8 @@ def _parse_spanish_datetime(value: str) -> datetime | None:
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
-    cleaned = re.sub(r"^[^\\d,]+,\\s*", "", cleaned)
-    match = re.search(
-        r"(\\d{1,2}) de ([a-zA-Záéíóúñ]+) de (\\d{4}), (\\d{2}):(\\d{2})",
-        cleaned,
-    )
+    cleaned = re.sub(r"^[^\d,]+,\s*", "", cleaned)
+    match = re.search(r"(\d{1,2}) de (\w+) de (\d{4}), (\d{2}):(\d{2})", cleaned)
     if not match:
         return None
     day = int(match.group(1))
@@ -649,7 +798,7 @@ def _format_datetime(value: datetime | None) -> str | None:
 def _parse_int_after_label(value: str) -> int | None:
     if ":" in value:
         value = value.split(":", 1)[1].strip()
-    match = re.search(r"(\\d+)", value)
+    match = re.search(r"(\d+)", value)
     if not match:
         return None
     try:
@@ -661,7 +810,7 @@ def _parse_int_after_label(value: str) -> int | None:
 def _parse_duration_minutes(value: str) -> int | None:
     if ":" in value:
         value = value.split(":", 1)[1].strip()
-    match = re.search(r"(\\d+)", value)
+    match = re.search(r"(\d+)", value)
     if not match:
         return None
     amount = int(match.group(1))
@@ -669,3 +818,164 @@ def _parse_duration_minutes(value: str) -> int | None:
     if "hora" in normalized:
         return amount * 60
     return amount
+
+async def _fill_feedback_form(page: Page) -> tuple[bool, str | None]:
+    await page.wait_for_load_state("domcontentloaded")
+
+    form_selector = "form#feedback_complete_form"
+    try:
+        await page.wait_for_selector(form_selector, timeout=10000)
+    except Exception:
+        form_selector = ""
+
+    form = page.locator(form_selector).first if form_selector else page.locator("form").first
+    if await form.count() == 0:
+        form = page.locator("form.feedback_form").first
+    if await form.count() == 0:
+        form = page.locator("form[action*='mod/feedback/complete.php']").first
+    if await form.count() == 0:
+        login_form = page.locator("input[name='username'], input[name='password']")
+        if await login_form.count() > 0:
+            return False, "login_required"
+        return False, "form_not_found"
+
+    radio_names = await form.locator("input[type='radio'][name]").evaluate_all(
+        "els => Array.from(new Set(els.map(e => e.name)))"
+    )
+    for name in radio_names:
+        group = form.locator(f"input[type='radio'][name='{name}']")
+        checked = await group.evaluate_all("els => els.some(e => e.checked)")
+        if checked:
+            continue
+        option = group.first
+        if await option.count() == 0 or await option.is_disabled():
+            continue
+        await option.check()
+
+    checkbox_names = await form.locator("input[type='checkbox'][name]").evaluate_all(
+        "els => Array.from(new Set(els.map(e => e.name)))"
+    )
+    for name in checkbox_names:
+        group = form.locator(f"input[type='checkbox'][name='{name}']")
+        checked = await group.evaluate_all("els => els.some(e => e.checked)")
+        if checked:
+            continue
+        option = group.first
+        if await option.count() == 0 or await option.is_disabled():
+            continue
+        await option.check()
+
+    selects = form.locator("select[name]")
+    for idx in range(await selects.count()):
+        select = selects.nth(idx)
+        values = await select.evaluate("el => Array.from(el.options).map(o => o.value)")
+        chosen = None
+        for value in values:
+            if value is not None and value != "":
+                chosen = value
+                break
+        if chosen is None and values:
+            chosen = values[0]
+        if chosen is not None:
+            await select.select_option(chosen)
+
+    textareas = form.locator("textarea[name]")
+    for idx in range(await textareas.count()):
+        field = textareas.nth(idx)
+        if (await field.input_value()).strip():
+            continue
+        await field.fill("Sin comentarios.")
+
+    inputs = form.locator(
+        "input[type='text'][name], input[type='number'][name], input[type='email'][name]"
+    )
+    for idx in range(await inputs.count()):
+        field = inputs.nth(idx)
+        if (await field.input_value()).strip():
+            continue
+        await field.fill("Sin comentarios.")
+
+    return True, None
+
+
+async def _detect_completion_status(page: Page) -> tuple[Optional[bool], Optional[str]]:
+    completion_text = await _safe_text(page.locator(".completion-info").first)
+    normalized_completion = _normalize_for_compare(completion_text)
+    if "por hacer" in normalized_completion:
+        return False, "completion_pending"
+    if "completado" in normalized_completion or "completo" in normalized_completion:
+        return True, "completion_badge"
+
+    body_text = await _safe_text(page.locator("body").first)
+    normalized = _normalize_for_compare(body_text)
+    success_markers = [
+        "gracias por completar",
+        "gracias por enviar",
+        "sus respuestas han sido enviadas",
+        "respuestas han sido enviadas",
+        "respuestas guardadas",
+        "ya ha completado",
+        "ya has completado",
+        "ya respondio",
+        "ya respondio la encuesta",
+    ]
+    for marker in success_markers:
+        if marker in normalized:
+            return True, "completion_text"
+    return None, None
+
+
+async def _safe_text(locator: Locator) -> str:
+    try:
+        text = await locator.text_content()
+    except Exception:
+        text = None
+    return text or ""
+
+
+def _extract_course_id(href: str) -> Optional[str]:
+    parsed = urlparse(href)
+    params = parse_qs(parsed.query)
+    course_ids = params.get("id")
+    if not course_ids:
+        return None
+    return course_ids[0]
+
+
+async def _extract_course_name(link: Locator) -> str:
+    candidates = [".multiline", ".text-truncate", ".coursename"]
+    for selector in candidates:
+        node = link.locator(selector).first
+        if await node.count() > 0:
+            name = _clean_course_name(await node.inner_text())
+            if name:
+                return name
+    return _clean_course_name(await link.inner_text())
+
+
+def _normalize_text_optional(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    return " ".join(value.split())
+
+
+def _clean_course_name(value: Optional[str]) -> str:
+    text = _normalize_text_optional(value)
+    if not text:
+        return ""
+    lowered = text.lower()
+    marker = "nombre del curso"
+    if lowered.startswith(marker):
+        text = _normalize_text_optional(text[len(marker) :])
+    if not text:
+        return ""
+    best = ""
+    for match in re.finditer(r"\s+", text):
+        prefix = text[: match.start()].strip()
+        rest = text[match.end() :].strip()
+        if len(prefix) < 30 or len(rest) < 8:
+            continue
+        if rest.startswith(prefix) or prefix.startswith(rest):
+            if len(prefix) > len(best):
+                best = prefix
+    return best or text
