@@ -7,9 +7,14 @@ import httpx
 from app.core.config import settings
 
 
-async def send_mailersend_email(subject: str, text: str) -> None:
-    if not settings.MAILERSEND_API_KEY or not settings.MAILERSEND_FROM_EMAIL or not settings.MAILERSEND_TO_EMAIL:
+async def send_mailersend_email(subject: str, text: str, to_email: str | None = None) -> None:
+    if not settings.MAILERSEND_API_KEY or not settings.MAILERSEND_FROM_EMAIL:
         logging.getLogger("mailer").warning("[MailerSend] Missing configuration; email skipped.")
+        return
+
+    recipient = to_email or settings.MAILERSEND_TO_EMAIL
+    if not recipient:
+        logging.getLogger("mailer").warning("[MailerSend] Missing recipient; email skipped.")
         return
 
     payload = {
@@ -17,7 +22,7 @@ async def send_mailersend_email(subject: str, text: str) -> None:
             "email": settings.MAILERSEND_FROM_EMAIL,
             "name": settings.MAILERSEND_FROM_NAME,
         },
-        "to": [{"email": settings.MAILERSEND_TO_EMAIL}],
+        "to": [{"email": recipient}],
         "subject": subject,
         "text": text,
     }

@@ -10,40 +10,51 @@ from app.models.moodle_grade_item import MoodleGradeItem
 from sqlalchemy.orm import Session, joinedload
 
 
-def get_course(db: Session, course_id: int) -> MoodleCourse | None:
-    return db.query(MoodleCourse).filter(MoodleCourse.id == course_id).first()
+def get_course(db: Session, course_id: int, user_id: int) -> MoodleCourse | None:
+    return (
+        db.query(MoodleCourse)
+        .filter(MoodleCourse.id == course_id, MoodleCourse.user_id == user_id)
+        .first()
+    )
 
 
 def list_courses(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     search: str | None = None,
 ) -> list[MoodleCourse]:
-    query = db.query(MoodleCourse)
+    query = db.query(MoodleCourse).filter(MoodleCourse.user_id == user_id)
     if search:
         query = query.filter(MoodleCourse.name.ilike(f"%{search}%"))
     return query.order_by(MoodleCourse.name.asc()).offset(skip).limit(limit).all()
 
 
-def get_module(db: Session, module_id: int) -> MoodleModule | None:
+def get_module(db: Session, module_id: int, user_id: int) -> MoodleModule | None:
     return (
         db.query(MoodleModule)
         .options(joinedload(MoodleModule.course))
-        .filter(MoodleModule.id == module_id)
+        .filter(MoodleModule.id == module_id, MoodleModule.course.has(user_id=user_id))
         .first()
     )
 
 
 def list_modules(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     course_id: int | None = None,
     visible: bool | None = None,
     has_survey: bool | None = None,
 ) -> list[MoodleModule]:
-    query = db.query(MoodleModule).options(joinedload(MoodleModule.course))
+    query = (
+        db.query(MoodleModule)
+        .options(joinedload(MoodleModule.course))
+        .join(MoodleModule.course)
+        .filter(MoodleCourse.user_id == user_id)
+    )
     if course_id is not None:
         query = query.filter(MoodleModule.course_id == course_id)
     if visible is not None:
@@ -58,25 +69,32 @@ def list_modules(
     )
 
 
-def get_module_survey(db: Session, survey_id: int) -> MoodleModuleSurvey | None:
+def get_module_survey(db: Session, survey_id: int, user_id: int) -> MoodleModuleSurvey | None:
     return (
         db.query(MoodleModuleSurvey)
         .options(joinedload(MoodleModuleSurvey.course), joinedload(MoodleModuleSurvey.module))
-        .filter(MoodleModuleSurvey.id == survey_id)
+        .join(MoodleModuleSurvey.course)
+        .filter(MoodleModuleSurvey.id == survey_id, MoodleCourse.user_id == user_id)
         .first()
     )
 
 
 def list_module_surveys(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     course_id: int | None = None,
     module_id: int | None = None,
 ) -> list[MoodleModuleSurvey]:
-    query = db.query(MoodleModuleSurvey).options(
-        joinedload(MoodleModuleSurvey.course),
-        joinedload(MoodleModuleSurvey.module),
+    query = (
+        db.query(MoodleModuleSurvey)
+        .options(
+            joinedload(MoodleModuleSurvey.course),
+            joinedload(MoodleModuleSurvey.module),
+        )
+        .join(MoodleModuleSurvey.course)
+        .filter(MoodleCourse.user_id == user_id)
     )
     if course_id is not None:
         query = query.filter(MoodleModuleSurvey.course_id == course_id)
@@ -96,12 +114,18 @@ def list_module_surveys(
 
 def list_grade_items(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     course_id: int | None = None,
     item_type: str | None = None,
 ) -> list[MoodleGradeItem]:
-    query = db.query(MoodleGradeItem).options(joinedload(MoodleGradeItem.course))
+    query = (
+        db.query(MoodleGradeItem)
+        .options(joinedload(MoodleGradeItem.course))
+        .join(MoodleGradeItem.course)
+        .filter(MoodleCourse.user_id == user_id)
+    )
     if course_id is not None:
         query = query.filter(MoodleGradeItem.course_id == course_id)
     if item_type is not None:
@@ -126,7 +150,7 @@ def mark_survey_completed(db: Session, survey: MoodleModuleSurvey) -> MoodleModu
     return survey
 
 
-def upsert_courses(db: Session, courses: Iterable[dict]) -> Dict[str, MoodleCourse]:
+def upsert_courses(db: Session, user_id: int, courses: Iterable[dict]) -> Dict[str, MoodleCourse]:
     course_list = list(courses)
     if not course_list:
         return {}
@@ -134,7 +158,7 @@ def upsert_courses(db: Session, courses: Iterable[dict]) -> Dict[str, MoodleCour
     external_ids = [course["id"] for course in course_list]
     existing = (
         db.query(MoodleCourse)
-        .filter(MoodleCourse.external_id.in_(external_ids))
+        .filter(MoodleCourse.user_id == user_id, MoodleCourse.external_id.in_(external_ids))
         .all()
     )
     existing_map = {course.external_id: course for course in existing}
@@ -148,7 +172,7 @@ def upsert_courses(db: Session, courses: Iterable[dict]) -> Dict[str, MoodleCour
             stored.name = name
             stored.last_seen_at = now
         else:
-            stored = MoodleCourse(external_id=external_id, name=name, last_seen_at=now)
+            stored = MoodleCourse(user_id=user_id, external_id=external_id, name=name, last_seen_at=now)
             db.add(stored)
             existing_map[external_id] = stored
 

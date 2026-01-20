@@ -1,0 +1,128 @@
+<div class="space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">Calendario de actividades</h1>
+      <p class="text-sm text-slate-500">Fechas de tareas, cuestionarios y tus propios pendientes.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        (click)="previousMonth()"
+        class="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 hover:border-slate-300 hover:text-slate-900"
+      >
+        Mes anterior
+      </button>
+      <div class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white">
+        {{ viewDate | date: 'MMMM y' }}
+      </div>
+      <button
+        type="button"
+        (click)="nextMonth()"
+        class="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 hover:border-slate-300 hover:text-slate-900"
+      >
+        Siguiente mes
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+    Cargando calendario...
+  </div>
+
+  <div *ngIf="!isLoading" class="grid gap-6 lg:grid-cols-[2fr_1fr]">
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="grid grid-cols-7 gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <div>Lun</div>
+        <div>Mar</div>
+        <div>Mie</div>
+        <div>Jue</div>
+        <div>Vie</div>
+        <div>Sab</div>
+        <div>Dom</div>
+      </div>
+      <div class="mt-3 grid grid-cols-7 gap-2">
+        <button
+          *ngFor="let day of days"
+          type="button"
+          (click)="selectDay(day)"
+          class="group relative flex h-24 flex-col rounded-2xl border border-transparent p-2 text-left transition hover:border-slate-200"
+          [class.bg-slate-900]="day.date.toDateString() === selectedDate.toDateString()"
+          [class.text-white]="day.date.toDateString() === selectedDate.toDateString()"
+        >
+          <span
+            class="text-xs font-semibold"
+            [class.text-slate-400]="!day.inMonth && day.date.toDateString() !== selectedDate.toDateString()"
+            [class.text-slate-100]="day.date.toDateString() === selectedDate.toDateString()"
+          >
+            {{ day.date | date: 'd' }}
+          </span>
+          <span
+            *ngIf="day.isToday"
+            class="absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-400"
+          ></span>
+          <div class="mt-2 space-y-1">
+            <div
+              *ngFor="let item of day.items.slice(0, 3)"
+              class="truncate rounded-lg px-2 py-1 text-[10px] font-medium"
+              [ngClass]="[
+                badgeClass(item),
+                day.date.toDateString() === selectedDate.toDateString() ? 'bg-slate-700 text-slate-100' : ''
+              ]"
+            >
+              {{ item.title }}
+            </div>
+            <div *ngIf="day.items.length > 3" class="text-[10px] text-slate-400">
+              +{{ day.items.length - 3 }} mas
+            </div>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <aside class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Dia seleccionado</div>
+          <div class="text-lg font-semibold text-slate-900">
+            {{ selectedDate | date: 'fullDate' }}
+          </div>
+        </div>
+        <div class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          {{ selectedItems.length }} items
+        </div>
+      </div>
+
+      <div *ngIf="selectedItems.length === 0" class="mt-6 text-sm text-slate-500">
+        No hay actividades para esta fecha.
+      </div>
+
+      <div *ngIf="selectedItems.length > 0" class="mt-4 space-y-3">
+        <div
+          *ngFor="let item of selectedItems"
+          class="rounded-xl border p-3"
+          [ngClass]="cardClass(item)"
+        >
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {{ item.type === 'assignment' ? 'Tarea' : item.type === 'quiz' ? 'Cuestionario' : 'Task' }}
+            </div>
+            <div class="text-xs font-semibold text-slate-500">{{ item.date | date: 'shortTime' }}</div>
+          </div>
+          <div class="mt-1 text-sm font-semibold text-slate-900">
+            {{ item.title }}
+          </div>
+          <div class="mt-1 text-xs text-slate-500">{{ item.status || 'Pendiente' }}</div>
+          <a
+            *ngIf="item.url"
+            class="mt-2 inline-flex text-xs font-semibold text-slate-700 hover:text-slate-900"
+            [href]="item.url"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir actividad
+          </a>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>

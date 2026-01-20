@@ -1,0 +1,80 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">Configuracion</h1>
+      <p class="text-sm text-slate-500">Gestiona acceso a Moodle y cron automatico.</p>
+    </div>
+    <button
+      (click)="logout()"
+      class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 hover:border-slate-300 hover:text-slate-900"
+    >
+      Cerrar sesion
+    </button>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Credenciales Moodle</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Se cifran con una clave derivada y un vault del servidor para cron automatico.
+      </p>
+      <form class="mt-4 space-y-3" [formGroup]="form" (ngSubmit)="saveCredentials()">
+        <input
+          type="text"
+          [formControl]="form.controls.moodle_username"
+          class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Usuario Moodle"
+        />
+        <input
+          type="password"
+          [formControl]="form.controls.moodle_password"
+          class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Password Moodle"
+        />
+        <input
+          type="password"
+          [formControl]="form.controls.app_password"
+          class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Password de la app"
+        />
+        <button
+          type="submit"
+          [disabled]="loading"
+          class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+        >
+          {{ loading ? 'Guardando...' : 'Guardar y habilitar cron' }}
+        </button>
+      </form>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Cron diario</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Estado actual:
+        <span class="font-semibold text-slate-900">{{ status?.cron_enabled ? 'Activo' : 'Inactivo' }}</span>
+      </p>
+      <form class="mt-4 space-y-3" [formGroup]="cronForm" (ngSubmit)="toggleCron(!status?.cron_enabled)">
+        <input
+          type="password"
+          [formControl]="cronForm.controls.app_password"
+          class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Password de la app"
+        />
+        <button
+          type="submit"
+          [disabled]="cronLoading"
+          class="w-full rounded-xl border border-slate-900 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white disabled:opacity-60"
+        >
+          {{ status?.cron_enabled ? 'Deshabilitar cron' : 'Habilitar cron' }}
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <div *ngIf="message" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+    {{ message }}
+  </div>
+  <div *ngIf="errorMessage" class="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+    {{ errorMessage }}
+  </div>
+</div>

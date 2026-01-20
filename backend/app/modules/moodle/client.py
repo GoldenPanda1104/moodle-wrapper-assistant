@@ -237,9 +237,16 @@ def _clean_course_name(value: Optional[str]) -> str:
     return best or text
 
 
-def build_client_from_settings() -> MoodleClient:
+def build_client_from_credentials(username: str, password: str) -> MoodleClient:
     return MoodleClient(
         base_url=settings.MOODLE_BASE_URL,
+        username=username,
+        password=password,
+    )
+
+
+def build_client_from_settings() -> MoodleClient:
+    return build_client_from_credentials(
         username=settings.MOODLE_USERNAME,
         password=settings.MOODLE_PASSWORD,
     )

@@ -87,6 +87,20 @@ export class GradesComponent {
     return value;
   }
 
+  statusBadgeClasses(value: string | null): string {
+    const normalized = (value || '').toLowerCase();
+    if (normalized.includes('enviado') || normalized.includes('calificado')) {
+      return 'bg-emerald-500 text-white';
+    }
+    if (normalized.includes('sin calificar')) {
+      return 'bg-amber-500 text-slate-900';
+    }
+    if (normalized.includes('no se han realizado') || normalized.includes('no enviado')) {
+      return 'bg-rose-500 text-white';
+    }
+    return 'bg-slate-300 text-slate-700';
+  }
+
   formatDue(item: MoodleGradeItem): string {
     return item.due_at ? item.due_at : '';
   }

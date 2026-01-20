@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, DateTime, Enum, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Enum, JSON, ForeignKey
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -39,6 +39,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     source = Column(Enum(TaskSource), nullable=False)
     category = Column(Enum(TaskCategory), nullable=False)

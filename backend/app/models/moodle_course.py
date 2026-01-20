@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, String, Text, ForeignKey
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -8,7 +8,8 @@ class MoodleCourse(Base):
     __tablename__ = "moodle_courses"
 
     id = Column(Integer, primary_key=True, index=True)
-    external_id = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    external_id = Column(String(64), nullable=False, index=True)
     name = Column(Text(), nullable=False)
     last_seen_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

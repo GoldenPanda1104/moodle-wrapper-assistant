@@ -10,6 +10,7 @@ class EventLogBase(BaseModel):
 
     event_type: str
     source: str
+    user_id: Optional[int] = None
     payload: Optional[Dict[str, Any]] = None
 
     @field_validator("event_type")

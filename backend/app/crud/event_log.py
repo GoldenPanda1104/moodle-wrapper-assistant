@@ -14,12 +14,13 @@ def create_event_log(db: Session, event_in: EventLogCreate) -> EventLog:
 
 def list_event_logs(
     db: Session,
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     event_type: str | None = None,
     source: str | None = None,
 ) -> list[EventLog]:
-    query = db.query(EventLog)
+    query = db.query(EventLog).filter(EventLog.user_id == user_id)
     if event_type:
         query = query.filter(EventLog.event_type == event_type)
     if source:

@@ -1,11 +1,11 @@
 import { Component, Input } from '@angular/core';
-import { NgClass, NgIf } from '@angular/common';
+import { DatePipe, NgClass, NgIf } from '@angular/common';
 import { Task } from '../../../core/models/task.model';
 
 @Component({
   selector: 'app-task-card',
   standalone: true,
-  imports: [NgClass, NgIf],
+  imports: [NgClass, NgIf, DatePipe],
   templateUrl: './task-card.component.html',
   styleUrl: './task-card.component.scss'
 })
@@ -35,6 +35,19 @@ export class TaskCardComponent {
         return 'border-yellow-500 text-yellow-700';
       default:
         return 'border-slate-400 text-slate-600';
+    }
+  }
+
+  get statusBadgeClass(): string {
+    switch (this.task.status) {
+      case 'done':
+        return 'bg-emerald-500 text-white';
+      case 'blocked':
+        return 'bg-rose-500 text-white';
+      case 'ready':
+        return 'bg-sky-500 text-white';
+      default:
+        return 'bg-amber-500 text-slate-900';
     }
   }
 }

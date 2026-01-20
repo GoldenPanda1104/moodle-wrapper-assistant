@@ -1,0 +1,41 @@
+<div class="mx-auto max-w-md space-y-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">Iniciar sesion</h1>
+    <p class="text-sm text-slate-500">Accede para sincronizar tus cursos y pendientes.</p>
+  </div>
+
+  <form class="space-y-4" [formGroup]="form" (ngSubmit)="submit()">
+    <div>
+      <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Correo</label>
+      <input
+        type="email"
+        [formControl]="form.controls.email"
+        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
+        placeholder="tu@correo.com"
+      />
+    </div>
+    <div>
+      <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Password</label>
+      <input
+        type="password"
+        [formControl]="form.controls.password"
+        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none"
+        placeholder="********"
+      />
+    </div>
+    <div *ngIf="errorMessage" class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      {{ errorMessage }}
+    </div>
+    <button
+      type="submit"
+      [disabled]="loading"
+      class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {{ loading ? 'Ingresando...' : 'Entrar' }}
+    </button>
+  </form>
+  <p class="text-center text-sm text-slate-500">
+    No tienes cuenta?
+    <a routerLink="/register" class="font-semibold text-slate-900 hover:underline">Crear cuenta</a>
+  </p>
+</div>

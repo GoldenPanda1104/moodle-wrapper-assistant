@@ -114,13 +114,15 @@
               </span>
               <span
                 *ngIf="item.item_type === 'assignment'"
-                class="rounded border border-slate-200 px-2 py-1"
+                class="rounded px-2 py-1"
+                [ngClass]="statusBadgeClasses(item.submission_status)"
               >
                 {{ formatStatus(item.submission_status) }}
               </span>
               <span
                 *ngIf="item.item_type === 'assignment'"
-                class="rounded border border-slate-200 px-2 py-1"
+                class="rounded px-2 py-1"
+                [ngClass]="statusBadgeClasses(item.grading_status)"
               >
                 {{ formatStatus(item.grading_status) }}
               </span>

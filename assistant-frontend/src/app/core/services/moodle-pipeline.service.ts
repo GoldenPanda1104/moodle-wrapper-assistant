@@ -1,6 +1,7 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { AuthService } from './auth.service';
 
 export interface PipelineEvent {
   event: string;
@@ -16,6 +17,7 @@ export class MoodlePipelineService {
     private readonly api: ApiService,
     private readonly zone: NgZone,
   ) {}
+  private readonly auth = inject(AuthService);
 
   runPipeline(kind: string = 'full'): Observable<{ run_id: string }> {
     return this.api.post<{ run_id: string }>(
@@ -26,7 +28,11 @@ export class MoodlePipelineService {
 
   streamPipeline(runId: string): Observable<PipelineEvent> {
     return new Observable((observer) => {
-      const source = new EventSource(`/api/v1/moodle/pipeline/stream/${runId}`);
+      const token = this.auth.getAccessToken();
+      const url = token
+        ? `/api/v1/moodle/pipeline/stream/${runId}?token=${encodeURIComponent(token)}`
+        : `/api/v1/moodle/pipeline/stream/${runId}`;
+      const source = new EventSource(url);
       source.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as PipelineEvent;

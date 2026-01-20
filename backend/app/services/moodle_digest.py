@@ -9,7 +9,7 @@ from app.crud import moodle as crud_moodle
 from app.core.config import settings
 
 
-def build_pending_summary(db: Session) -> tuple[str, str]:
+def build_pending_summary(db: Session, user_id: int) -> tuple[str, str]:
     try:
         tz = ZoneInfo(settings.APP_TIMEZONE)
     except Exception:
@@ -17,10 +17,12 @@ def build_pending_summary(db: Session) -> tuple[str, str]:
     now = datetime.now(tz)
     cutoff = now + timedelta(days=7)
 
-    surveys = crud_moodle.list_module_surveys(db, limit=5000)
+    surveys = crud_moodle.list_module_surveys(db, user_id=user_id, limit=5000)
     pending_surveys = [survey for survey in surveys if survey.completed_at is None]
 
-    assignments = crud_moodle.list_grade_items(db, item_type="assignment", limit=5000)
+    assignments = crud_moodle.list_grade_items(
+        db, user_id=user_id, item_type="assignment", limit=5000
+    )
     pending_assignments = []
     for item in assignments:
         status = (item.submission_status or "").lower()
@@ -30,7 +32,7 @@ def build_pending_summary(db: Session) -> tuple[str, str]:
         if not_submitted and within_window:
             pending_assignments.append(item)
 
-    quizzes = crud_moodle.list_grade_items(db, item_type="quiz", limit=5000)
+    quizzes = crud_moodle.list_grade_items(db, user_id=user_id, item_type="quiz", limit=5000)
     pending_quizzes = []
     for item in quizzes:
         due_at = item.due_at

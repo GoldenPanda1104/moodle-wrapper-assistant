@@ -11,7 +11,7 @@ from app.crud import moodle as crud_moodle
 from app.db.session import get_db
 from app.db.session import SessionLocal
 from app.modules.moodle.complete import complete_survey as complete_moodle_survey
-from app.modules.moodle.client import build_client_from_settings
+from app.modules.moodle.client import build_client_from_credentials
 from app.modules.moodle.scraper import enrich_modules_with_surveys, scrape_modules
 from app.modules.moodle import pipeline as moodle_pipeline
 from app.schemas.moodle_course import MoodleCourseRead
@@ -19,9 +19,27 @@ from app.schemas.moodle_module import MoodleModuleRead
 from app.schemas.moodle_module_survey import MoodleModuleSurveyRead
 from app.schemas.moodle_grade_item import MoodleGradeItemRead
 from app.services.pipeline_stream import PipelineEvent, PipelineStreamManager
+from app.services.auth import verify_jwt_token
+from app.api.v1.deps import get_current_user
+from app.crud.moodle_vault import get_vault
+from app.services.vault_crypto import decrypt_aes_gcm, load_server_master_key
+import json as jsonlib
 
 router = APIRouter()
 pipeline_stream = PipelineStreamManager()
+
+
+def _build_client_from_vault(db: Session, user_id: int):
+    vault = get_vault(db, user_id)
+    if not vault or not vault.pipeline_key_wrapped_server or not vault.pipeline_key_wrapped_server_nonce:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vault credentials not available")
+    server_key = load_server_master_key()
+    pipeline_key = decrypt_aes_gcm(
+        server_key, vault.pipeline_key_wrapped_server_nonce, vault.pipeline_key_wrapped_server
+    )
+    creds_blob = decrypt_aes_gcm(pipeline_key, vault.credentials_nonce, vault.credentials_ciphertext)
+    creds = jsonlib.loads(creds_blob.decode("utf-8"))
+    return build_client_from_credentials(creds.get("username", ""), creds.get("password", ""))
 
 
 async def _refresh_course_surveys(db: Session, client, course) -> None:
@@ -40,13 +58,14 @@ def list_courses(
     limit: int = Query(default=100, ge=1, le=500),
     search: str | None = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    return crud_moodle.list_courses(db, skip=skip, limit=limit, search=search)
+    return crud_moodle.list_courses(db, user_id=current_user.id, skip=skip, limit=limit, search=search)
 
 
 @router.get("/courses/{course_id}", response_model=MoodleCourseRead)
-def get_course(course_id: int, db: Session = Depends(get_db)):
-    course = crud_moodle.get_course(db, course_id=course_id)
+def get_course(course_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    course = crud_moodle.get_course(db, course_id=course_id, user_id=current_user.id)
     if course is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     return course
@@ -60,9 +79,11 @@ def list_modules(
     visible: bool | None = None,
     has_survey: bool | None = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     return crud_moodle.list_modules(
         db,
+        user_id=current_user.id,
         skip=skip,
         limit=limit,
         course_id=course_id,
@@ -72,8 +93,8 @@ def list_modules(
 
 
 @router.get("/modules/{module_id}", response_model=MoodleModuleRead)
-def get_module(module_id: int, db: Session = Depends(get_db)):
-    module = crud_moodle.get_module(db, module_id=module_id)
+def get_module(module_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    module = crud_moodle.get_module(db, module_id=module_id, user_id=current_user.id)
     if module is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Module not found")
     return module
@@ -86,9 +107,11 @@ def list_surveys(
     course_id: int | None = None,
     module_id: int | None = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     return crud_moodle.list_module_surveys(
         db,
+        user_id=current_user.id,
         skip=skip,
         limit=limit,
         course_id=course_id,
@@ -97,8 +120,8 @@ def list_surveys(
 
 
 @router.get("/surveys/{survey_id}", response_model=MoodleModuleSurveyRead)
-def get_survey(survey_id: int, db: Session = Depends(get_db)):
-    survey = crud_moodle.get_module_survey(db, survey_id=survey_id)
+def get_survey(survey_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    survey = crud_moodle.get_module_survey(db, survey_id=survey_id, user_id=current_user.id)
     if survey is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
     return survey
@@ -111,9 +134,11 @@ def list_grade_items(
     course_id: int | None = None,
     item_type: str | None = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     return crud_moodle.list_grade_items(
         db,
+        user_id=current_user.id,
         skip=skip,
         limit=limit,
         course_id=course_id,
@@ -122,8 +147,12 @@ def list_grade_items(
 
 
 @router.post("/surveys/complete/{survey_id}")
-async def complete_survey(survey_id: int, db: Session = Depends(get_db)):
-    survey = crud_moodle.get_module_survey(db, survey_id=survey_id)
+async def complete_survey(
+    survey_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    survey = crud_moodle.get_module_survey(db, survey_id=survey_id, user_id=current_user.id)
     if survey is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
     if not survey.completion_url:
@@ -131,15 +160,24 @@ async def complete_survey(survey_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Survey completion URL not available",
         )
-    result = await complete_moodle_survey(survey.completion_url)
+    client = _build_client_from_vault(db, current_user.id)
+    await client.login()
+    try:
+        result = await complete_moodle_survey(survey.completion_url, client=client)
+    finally:
+        await client.close()
     if result.get("submitted") or result.get("reason") in {"completion_badge", "completion_text", "already_completed"}:
         crud_moodle.mark_survey_completed(db, survey)
     return {"detail": "Survey submission attempted", "result": result}
 
 
 @router.post("/courses/{course_id}/surveys/complete-all")
-async def complete_course_surveys(course_id: int, db: Session = Depends(get_db)):
-    course = crud_moodle.get_course(db, course_id=course_id)
+async def complete_course_surveys(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    course = crud_moodle.get_course(db, course_id=course_id, user_id=current_user.id)
     if course is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
@@ -147,12 +185,14 @@ async def complete_course_surveys(course_id: int, db: Session = Depends(get_db))
     attempted: set[int] = set()
     results: list[dict] = []
 
-    client = build_client_from_settings()
+    client = _build_client_from_vault(db, current_user.id)
     await client.login()
     try:
         await _refresh_course_surveys(db, client, course)
         for _ in range(max_cycles):
-            surveys = crud_moodle.list_module_surveys(db, course_id=course_id, limit=1000)
+            surveys = crud_moodle.list_module_surveys(
+                db, user_id=current_user.id, course_id=course_id, limit=1000
+            )
             pending = [
                 survey
                 for survey in surveys
@@ -194,14 +234,17 @@ async def complete_course_surveys(course_id: int, db: Session = Depends(get_db))
 
 
 @router.post("/pipeline/run")
-async def run_pipeline(kind: str = "full"):
+async def run_pipeline(kind: str = "full", current_user=Depends(get_current_user)):
     run_id = await pipeline_stream.create_run()
-    asyncio.create_task(_run_pipeline_background(run_id, kind))
+    asyncio.create_task(_run_pipeline_background(run_id, kind, current_user.id))
     return {"run_id": run_id}
 
 
 @router.get("/pipeline/stream/{run_id}")
-async def stream_pipeline(run_id: str):
+async def stream_pipeline(run_id: str, token: str | None = None):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    verify_jwt_token(token)
     try:
         queue = await pipeline_stream.subscribe(run_id)
     except KeyError as exc:
@@ -230,7 +273,7 @@ async def stream_pipeline(run_id: str):
     return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
-async def _run_pipeline_background(run_id: str, kind: str) -> None:
+async def _run_pipeline_background(run_id: str, kind: str, user_id: int) -> None:
     logger = logging.getLogger("moodle")
     loop = asyncio.get_running_loop()
     handler = _PipelineLogHandler(loop, run_id)
@@ -246,7 +289,7 @@ async def _run_pipeline_background(run_id: str, kind: str) -> None:
             run_id,
             PipelineEvent(event="status", message=f"Pipeline started ({kind}).").to_payload(),
         )
-        await _run_pipeline_by_kind(db, kind)
+        await _run_pipeline_by_kind(db, kind, user_id)
         await pipeline_stream.mark_done(
             run_id,
             PipelineEvent(event="done", message="Pipeline completed.").to_payload(),
@@ -261,20 +304,20 @@ async def _run_pipeline_background(run_id: str, kind: str) -> None:
         db.close()
 
 
-async def _run_pipeline_by_kind(db: Session, kind: str) -> None:
+async def _run_pipeline_by_kind(db: Session, kind: str, user_id: int) -> None:
     normalized = kind.strip().lower()
     if normalized == "courses":
-        await moodle_pipeline.async_run_courses_pipeline(db)
+        await moodle_pipeline.async_run_courses_pipeline(db, user_id)
     elif normalized == "modules":
-        await moodle_pipeline.async_run_modules_pipeline(db)
+        await moodle_pipeline.async_run_modules_pipeline(db, user_id)
     elif normalized == "surveys":
-        await moodle_pipeline.async_run_surveys_pipeline(db)
+        await moodle_pipeline.async_run_surveys_pipeline(db, user_id)
     elif normalized == "grades":
-        await moodle_pipeline.async_run_grades_pipeline(db)
+        await moodle_pipeline.async_run_grades_pipeline(db, user_id)
     elif normalized == "quizzes":
-        await moodle_pipeline.async_run_quizzes_pipeline(db)
+        await moodle_pipeline.async_run_quizzes_pipeline(db, user_id)
     else:
-        await moodle_pipeline.async_run_pipeline(db)
+        await moodle_pipeline.async_run_pipeline(db, user_id)
 
 
 class _PipelineLogHandler(logging.Handler):

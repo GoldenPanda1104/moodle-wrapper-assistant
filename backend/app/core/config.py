@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     MAILERSEND_FROM_EMAIL: str = ""
     MAILERSEND_FROM_NAME: str = "Suantechs Assistant"
     MAILERSEND_TO_EMAIL: str = ""
+    JWT_SECRET: str = "change-me"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    SERVER_MASTER_KEY: str = ""
 
     class Config:
         env_file = ".env"

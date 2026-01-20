@@ -10,7 +10,10 @@
           <div class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Mission Control UI</div>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-1 rounded-full bg-slate-100/80 p-1 text-[12px] font-medium text-slate-600">
+      <div
+        *ngIf="isAuthenticated(); else guestNav"
+        class="flex flex-wrap items-center gap-1 rounded-full bg-slate-100/80 p-1 text-[12px] font-medium text-slate-600"
+      >
         <a
           routerLink="/"
           routerLinkActive="bg-white text-slate-900 shadow-sm"
@@ -61,7 +64,37 @@
         >
           Calificaciones
         </a>
+        <a
+          routerLink="/calendar"
+          routerLinkActive="bg-white text-slate-900 shadow-sm"
+          class="rounded-full px-3 py-2 transition hover:bg-white hover:text-slate-900"
+        >
+          Calendario
+        </a>
+        <a
+          routerLink="/settings"
+          routerLinkActive="bg-white text-slate-900 shadow-sm"
+          class="rounded-full px-3 py-2 transition hover:bg-white hover:text-slate-900"
+        >
+          Configuracion
+        </a>
       </div>
+      <ng-template #guestNav>
+        <div class="flex items-center gap-2 text-sm font-medium text-slate-600">
+          <a
+            routerLink="/login"
+            class="rounded-full px-4 py-2 transition hover:bg-slate-100"
+          >
+            Iniciar sesion
+          </a>
+          <a
+            routerLink="/register"
+            class="rounded-full bg-slate-900 px-4 py-2 text-white transition hover:bg-slate-800"
+          >
+            Crear cuenta
+          </a>
+        </div>
+      </ng-template>
     </nav>
 
     <main class="rounded-2xl border border-slate-200/70 bg-white/85 p-6 shadow-xl shadow-slate-200/50 backdrop-blur">
