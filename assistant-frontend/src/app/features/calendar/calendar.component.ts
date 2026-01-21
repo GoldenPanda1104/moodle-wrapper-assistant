@@ -1,5 +1,5 @@
 import { Component, DestroyRef, inject } from '@angular/core';
-import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TaskService } from '../../core/services/task.service';
@@ -27,7 +27,7 @@ interface CalendarDay {
 @Component({
   selector: 'app-calendar',
   standalone: true,
-  imports: [DatePipe, NgFor, NgIf],
+  imports: [DatePipe, NgClass, NgFor, NgIf],
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss'
 })
