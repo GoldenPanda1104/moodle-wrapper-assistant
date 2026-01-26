@@ -1,0 +1,3 @@
+[submodule ".ai-system"]
+	path = .ai-system
+	url = https://github.com/GoldenPanda1104/ai-templates.git
