@@ -1,10 +1,10 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly http = inject(HttpClient);
+  constructor(private readonly http: HttpClient) {}
   private readonly baseUrl = '/api/v1';
 
   get<T>(path: string, params?: Record<string, string | number>): Observable<T> {

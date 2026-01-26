@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
@@ -12,7 +12,7 @@ import { AuthService } from './core/services/auth.service';
 })
 export class AppComponent {
   title = 'assistant-frontend';
-  private readonly auth = inject(AuthService);
+  constructor(private readonly auth: AuthService) {}
 
   isAuthenticated(): boolean {
     return this.auth.isAuthenticated();

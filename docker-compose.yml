@@ -16,13 +16,15 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PROJECT_NAME: ${PROJECT_NAME}
       MOODLE_BASE_URL: ${MOODLE_BASE_URL}
       SERVER_MASTER_KEY: ${SERVER_MASTER_KEY}
       JWT_SECRET: ${JWT_SECRET}
-      APP_TIMEZONE: ${APP_TIMEZONE:-America/Panama}
+      APP_TIMEZONE: ${APP_TIMEZONE}
       MAILERSEND_API_KEY: ${MAILERSEND_API_KEY}
       MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL}
       MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME}

@@ -1,11 +1,11 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
 import { Task } from '../models/task.model';
 
 @Injectable({ providedIn: 'root' })
 export class TaskService {
-  private readonly api = inject(ApiService);
+  constructor(private readonly api: ApiService) {}
 
   getTasks(): Observable<Task[]> {
     return this.api.get<Task[]>('/tasks/');

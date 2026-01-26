@@ -1,4 +1,4 @@
-import { Injectable, NgZone, inject } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { AuthService } from './auth.service';
@@ -16,8 +16,8 @@ export class MoodlePipelineService {
   constructor(
     private readonly api: ApiService,
     private readonly zone: NgZone,
+    private readonly auth: AuthService,
   ) {}
-  private readonly auth = inject(AuthService);
 
   runPipeline(kind: string = 'full'): Observable<{ run_id: string }> {
     return this.api.post<{ run_id: string }>(

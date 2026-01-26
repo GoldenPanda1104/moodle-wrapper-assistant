@@ -1,5 +1,5 @@
 import { DatePipe, NgFor, NgIf } from '@angular/common';
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MoodleCourse } from '../../core/models/moodle-course.model';
 import { MoodleModule } from '../../core/models/moodle-module.model';
@@ -13,8 +13,10 @@ import { MoodleModuleService } from '../../core/services/moodle-module.service';
   styleUrl: './modules.component.scss',
 })
 export class ModulesComponent {
-  private readonly moduleService = inject(MoodleModuleService);
-  private readonly destroyRef = inject(DestroyRef);
+  constructor(
+    private readonly moduleService: MoodleModuleService,
+    private readonly destroyRef: DestroyRef,
+  ) {}
 
   modules: MoodleModule[] = [];
   filteredModules: MoodleModule[] = [];

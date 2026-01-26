@@ -1,11 +1,11 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { MoodleCourse } from '../models/moodle-course.model';
 
 @Injectable({ providedIn: 'root' })
 export class MoodleCourseService {
-  private readonly api = inject(ApiService);
+  constructor(private readonly api: ApiService) {}
 
   getCourses(): Observable<MoodleCourse[]> {
     return this.api.get<MoodleCourse[]>('/moodle/courses');

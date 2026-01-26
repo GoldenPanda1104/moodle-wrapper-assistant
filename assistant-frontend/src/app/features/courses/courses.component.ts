@@ -1,5 +1,5 @@
 import { DatePipe, NgFor, NgIf } from '@angular/common';
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MoodleCourse } from '../../core/models/moodle-course.model';
 import { MoodleCourseService } from '../../core/services/moodle-course.service';
@@ -12,8 +12,10 @@ import { MoodleCourseService } from '../../core/services/moodle-course.service';
   styleUrl: './courses.component.scss',
 })
 export class CoursesComponent {
-  private readonly courseService = inject(MoodleCourseService);
-  private readonly destroyRef = inject(DestroyRef);
+  constructor(
+    private readonly courseService: MoodleCourseService,
+    private readonly destroyRef: DestroyRef,
+  ) {}
 
   courses: MoodleCourse[] = [];
   isLoading = true;
