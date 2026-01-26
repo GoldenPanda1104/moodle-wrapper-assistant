@@ -1,0 +1,10 @@
+{
+  "stack": [
+    "backend/python/v3.14",
+    "frontend/angular/v17"
+  ],
+  "auth": ["auth/jwt"],
+  "database": ["database/postgres"],
+  "api": ["api-design"],
+  "testing": true
+}

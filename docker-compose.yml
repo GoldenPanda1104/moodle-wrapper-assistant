@@ -5,30 +5,39 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: assistant
-    ports:
-      - "5442:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
-    env_file:
-      - ./.env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PROJECT_NAME: ${PROJECT_NAME}
       MOODLE_BASE_URL: ${MOODLE_BASE_URL}
       SERVER_MASTER_KEY: ${SERVER_MASTER_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      APP_TIMEZONE: ${APP_TIMEZONE}
+      MAILERSEND_API_KEY: ${MAILERSEND_API_KEY}
+      MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL}
+      MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME}
+      MAILERSEND_TO_EMAIL: ${MAILERSEND_TO_EMAIL}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
     depends_on:
       - db
-    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app"]
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
