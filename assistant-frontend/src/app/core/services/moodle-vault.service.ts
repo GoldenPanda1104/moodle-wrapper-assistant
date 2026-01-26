@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable } from 'rxjs';
 
@@ -9,7 +9,7 @@ export interface VaultStatus {
 
 @Injectable({ providedIn: 'root' })
 export class MoodleVaultService {
-  private readonly api = inject(ApiService);
+  constructor(private readonly api: ApiService) {}
 
   getStatus(): Observable<VaultStatus> {
     return this.api.get<VaultStatus>('/vault/status');

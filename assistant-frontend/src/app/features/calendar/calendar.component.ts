@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -32,9 +32,11 @@ interface CalendarDay {
   styleUrl: './calendar.component.scss'
 })
 export class CalendarComponent {
-  private readonly taskService = inject(TaskService);
-  private readonly gradeService = inject(MoodleGradeService);
-  private readonly destroyRef = inject(DestroyRef);
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly gradeService: MoodleGradeService,
+    private readonly destroyRef: DestroyRef,
+  ) {}
 
   viewDate = new Date();
   days: CalendarDay[] = [];

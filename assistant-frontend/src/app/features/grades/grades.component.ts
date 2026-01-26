@@ -1,5 +1,5 @@
 import { DatePipe, NgClass, NgFor, NgIf } from '@angular/common';
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MoodleCourse } from '../../core/models/moodle-course.model';
 import { MoodleGradeItem } from '../../core/models/moodle-grade-item.model';
@@ -13,8 +13,10 @@ import { MoodleGradeService } from '../../core/services/moodle-grade.service';
   styleUrl: './grades.component.scss',
 })
 export class GradesComponent {
-  private readonly gradeService = inject(MoodleGradeService);
-  private readonly destroyRef = inject(DestroyRef);
+  constructor(
+    private readonly gradeService: MoodleGradeService,
+    private readonly destroyRef: DestroyRef,
+  ) {}
 
   gradeItems: MoodleGradeItem[] = [];
   filteredGradeItems: MoodleGradeItem[] = [];

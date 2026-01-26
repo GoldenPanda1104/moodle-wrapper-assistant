@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgIf } from '@angular/common';
@@ -11,9 +11,11 @@ import { AuthService } from '../../core/services/auth.service';
   templateUrl: './register.component.html'
 })
 export class RegisterComponent {
-  private readonly fb = inject(FormBuilder);
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
+  constructor(
+    private readonly fb: FormBuilder,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+  ) {}
 
   errorMessage = '';
   loading = false;

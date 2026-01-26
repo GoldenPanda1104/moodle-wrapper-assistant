@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -23,12 +23,14 @@ import { MoodleCourse } from '../../core/models/moodle-course.model';
   styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent {
-  private readonly taskService = inject(TaskService);
-  private readonly eventService = inject(EventService);
-  private readonly pipelineService = inject(MoodlePipelineService);
-  private readonly surveyService = inject(MoodleSurveyService);
-  private readonly gradeService = inject(MoodleGradeService);
-  private readonly destroyRef = inject(DestroyRef);
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly eventService: EventService,
+    private readonly pipelineService: MoodlePipelineService,
+    private readonly surveyService: MoodleSurveyService,
+    private readonly gradeService: MoodleGradeService,
+    private readonly destroyRef: DestroyRef,
+  ) {}
 
   todayTasks: Task[] = [];
   blockedTasks: Task[] = [];

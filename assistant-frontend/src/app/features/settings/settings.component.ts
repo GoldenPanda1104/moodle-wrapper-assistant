@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { MoodleVaultService, VaultStatus } from '../../core/services/moodle-vault.service';
@@ -12,10 +12,12 @@ import { NgIf } from '@angular/common';
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
-  private readonly fb = inject(FormBuilder);
-  private readonly vault = inject(MoodleVaultService);
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
+  constructor(
+    private readonly fb: FormBuilder,
+    private readonly vault: MoodleVaultService,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+  ) {}
 
   status: VaultStatus | null = null;
   message = '';
