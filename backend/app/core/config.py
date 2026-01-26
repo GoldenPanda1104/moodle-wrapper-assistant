@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,16 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @field_validator("APP_TIMEZONE", mode="before")
+    @classmethod
+    def normalize_app_timezone(cls, value: str) -> str:
+        if value is None:
+            return "America/Panama"
+        normalized = str(value).strip()
+        if not normalized:
+            return "America/Panama"
+        return normalized
 
 
 settings = Settings()
