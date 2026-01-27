@@ -1,14 +1,14 @@
-<div class="flex items-center justify-between gap-4 border-b border-slate-200 py-3">
+<div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 py-4">
   <div class="flex items-center gap-3">
-    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-700">
-      *
+    <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-700">
+      EV
     </span>
     <div>
       <div class="text-sm font-semibold text-slate-900">{{ event.event_type }}</div>
-      <div class="text-[11px] uppercase tracking-wide text-slate-500">{{ event.source }}</div>
+      <div class="text-[11px] uppercase tracking-[0.2em] text-slate-400">{{ event.source }}</div>
     </div>
   </div>
-  <div class="text-[11px] uppercase tracking-wide text-slate-500">
+  <div class="rounded-full bg-slate-50 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-500">
     {{ relativeTime }}
   </div>
 </div>

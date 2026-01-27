@@ -102,6 +102,38 @@ Notes:
 - Frontend code: `assistant-frontend`
 - Database volume: `postgres_data`
 
+### Local dev (backend in Docker, frontend local)
+
+1) Start backend + db:
+
+```bash
+docker-compose up -d db backend
+```
+
+2) Run the frontend locally:
+
+```bash
+cd assistant-frontend
+npm install
+npm run start:local
+```
+
+This uses `assistant-frontend/proxy.local.json` to reach `http://localhost:8000`.
+
+## PWA
+
+The frontend is configured as a Progressive Web App for production builds.
+
+- Manifest: `assistant-frontend/src/manifest.webmanifest`
+- Service worker: `assistant-frontend/ngsw-config.json`
+
+Build the frontend in production to enable the service worker:
+
+```bash
+cd assistant-frontend
+npm run build -- --configuration production
+```
+
 ## License
 
 Licensed under the GNU Affero General Public License v3.0. See `LICENSE`.

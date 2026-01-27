@@ -1,31 +1,21 @@
 <section class="space-y-8">
-  <header
-    class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between"
-  >
-    <div class="space-y-2">
-      <div
-        class="text-[12px] font-mono uppercase tracking-[0.2em] text-slate-500"
-      >
-        Mission Control
-      </div>
-      <h1 class="text-2xl font-semibold text-slate-900">Panel operativo</h1>
-      <p class="text-sm text-slate-600">
-        Vista inmediata del estado del asistente. Datos en tiempo real desde
-        Task Core y EventLog.
+  <header class="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <div class="text-[12px] uppercase tracking-[0.3em] text-slate-400">Mission Control</div>
+      <h1 class="mt-2 text-2xl font-semibold text-slate-900">Panel operativo</h1>
+      <p class="text-sm text-slate-500">
+        Vista inmediata del estado del asistente con datos sincronizados desde Moodle.
       </p>
     </div>
-    <div class="flex items-center gap-3">
-      <div
-        class="text-[11px] uppercase tracking-wide text-slate-500"
-        *ngIf="lastUpdated"
-      >
+    <div class="flex flex-wrap items-center gap-3">
+      <div *ngIf="lastUpdated" class="rounded-full bg-slate-50 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-500">
         Actualizado {{ lastUpdated | date: "HH:mm:ss" }}
       </div>
       <button
         type="button"
         (click)="refresh()"
         [disabled]="isRefreshing"
-        class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {{ isRefreshing ? "Actualizando..." : "Actualizar" }}
       </button>
@@ -34,7 +24,7 @@
 
   <div
     *ngIf="isLoading"
-    class="rounded border border-slate-200 bg-white p-6 text-sm text-slate-600"
+    class="rounded-3xl border border-slate-200/80 bg-white p-6 text-sm text-slate-600 shadow-sm"
   >
     Cargando estado operativo...
   </div>
@@ -57,9 +47,7 @@
         </span>
       </div>
       <div class="grid gap-4 lg:grid-cols-3">
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-        >
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div class="text-xs uppercase tracking-wide text-slate-400">
@@ -67,9 +55,7 @@
               </div>
               <h3 class="text-base font-semibold text-slate-900">Encuestas</h3>
             </div>
-            <span
-              class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500"
-            >
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">
               {{ pendingSurveys.length }} pendientes
             </span>
           </div>
@@ -98,16 +84,14 @@
             </div>
             <div
               *ngIf="pendingSurveys.length === 0"
-              class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500"
+              class="rounded-2xl border border-dashed border-slate-200 p-3 text-sm text-slate-500"
             >
               No hay encuestas pendientes.
             </div>
           </div>
         </div>
 
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-        >
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div class="text-xs uppercase tracking-wide text-slate-400">
@@ -115,9 +99,7 @@
               </div>
               <h3 class="text-base font-semibold text-slate-900">Tareas</h3>
             </div>
-            <span
-              class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500"
-            >
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">
               {{ pendingAssignments.length }} pendientes
             </span>
           </div>
@@ -149,16 +131,14 @@
             </div>
             <div
               *ngIf="pendingAssignments.length === 0"
-              class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500"
+              class="rounded-2xl border border-dashed border-slate-200 p-3 text-sm text-slate-500"
             >
               No hay tareas pendientes.
             </div>
           </div>
         </div>
 
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-        >
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div class="text-xs uppercase tracking-wide text-slate-400">
@@ -168,9 +148,7 @@
                 Cuestionarios
               </h3>
             </div>
-            <span
-              class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500"
-            >
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">
               {{ pendingQuizzes.length }} pendientes
             </span>
           </div>
@@ -202,7 +180,7 @@
             </div>
             <div
               *ngIf="pendingQuizzes.length === 0"
-              class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500"
+              class="rounded-2xl border border-dashed border-slate-200 p-3 text-sm text-slate-500"
             >
               No hay cuestionarios pendientes.
             </div>
@@ -223,9 +201,7 @@
         </span>
       </div>
       <div class="grid gap-4 lg:grid-cols-2">
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-        >
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div class="text-xs uppercase tracking-wide text-slate-400">
@@ -233,9 +209,7 @@
               </div>
               <h3 class="text-base font-semibold text-slate-900">Tareas</h3>
             </div>
-            <span
-              class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500"
-            >
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">
               {{ upcomingAssignments.length }} proximas
             </span>
           </div>
@@ -267,16 +241,14 @@
             </div>
             <div
               *ngIf="upcomingAssignments.length === 0"
-              class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500"
+              class="rounded-2xl border border-dashed border-slate-200 p-3 text-sm text-slate-500"
             >
               No hay tareas proximas.
             </div>
           </div>
         </div>
 
-        <div
-          class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-        >
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div class="text-xs uppercase tracking-wide text-slate-400">
@@ -286,9 +258,7 @@
                 Cuestionarios
               </h3>
             </div>
-            <span
-              class="rounded-full bg-slate-100 px-2 py-1 text-[11px] uppercase text-slate-500"
-            >
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">
               {{ upcomingQuizzes.length }} proximos
             </span>
           </div>
@@ -320,10 +290,79 @@
             </div>
             <div
               *ngIf="upcomingQuizzes.length === 0"
-              class="rounded border border-dashed border-slate-200 p-3 text-sm text-slate-500"
+              class="rounded-2xl border border-dashed border-slate-200 p-3 text-sm text-slate-500"
             >
               No hay cuestionarios proximos.
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[12px] font-mono uppercase tracking-[0.2em] text-slate-500">INSIGHTS</h2>
+        <span class="text-[11px] uppercase text-slate-400">Panel de analiticas</span>
+      </div>
+      <div class="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400">Performance</div>
+              <h3 class="text-base font-semibold text-slate-900">Carga semanal</h3>
+            </div>
+            <div class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">Resumen</div>
+          </div>
+          <div class="mt-4 h-56">
+            <p-chart *ngIf="chartWorkloadData" type="line" [data]="chartWorkloadData" [options]="chartWorkloadOptions"></p-chart>
+          </div>
+        </div>
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div class="text-xs uppercase tracking-wide text-slate-400">Estado rapido</div>
+          <div class="mt-4 space-y-3">
+            <div class="rounded-2xl bg-slate-50 px-4 py-3">
+              <div class="text-[11px] uppercase text-slate-400">Pendientes</div>
+              <div class="text-xl font-semibold text-slate-900">
+                {{ pendingSurveys.length + pendingAssignments.length + pendingQuizzes.length }}
+              </div>
+            </div>
+            <div class="rounded-2xl bg-slate-50 px-4 py-3">
+              <div class="text-[11px] uppercase text-slate-400">Proximos 7 dias</div>
+              <div class="text-xl font-semibold text-slate-900">
+                {{ upcomingAssignments.length + upcomingQuizzes.length }}
+              </div>
+            </div>
+            <div class="rounded-2xl bg-slate-50 px-4 py-3">
+              <div class="text-[11px] uppercase text-slate-400">Bloqueadas</div>
+              <div class="text-xl font-semibold text-slate-900">
+                {{ blockedTasks.length }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid gap-4 lg:grid-cols-3">
+        <div class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400">Distribucion</div>
+              <h3 class="text-base font-semibold text-slate-900">Estado de carga</h3>
+            </div>
+          </div>
+          <div class="mt-4 h-56">
+            <p-chart *ngIf="chartDistributionData" type="doughnut" [data]="chartDistributionData" [options]="chartDistributionOptions"></p-chart>
+          </div>
+        </div>
+        <div class="lg:col-span-2 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400">Vencimientos</div>
+              <h3 class="text-base font-semibold text-slate-900">Proximos 7 dias</h3>
+            </div>
+            <div class="rounded-full bg-slate-100 px-3 py-1 text-[11px] uppercase text-slate-500">Calendario</div>
+          </div>
+          <div class="mt-4 h-56">
+            <p-chart *ngIf="chartDueData" type="bar" [data]="chartDueData" [options]="chartDueOptions"></p-chart>
           </div>
         </div>
       </div>
@@ -348,7 +387,7 @@
             type="button"
             (click)="runPipeline('courses')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "courses"
@@ -360,7 +399,7 @@
             type="button"
             (click)="runPipeline('modules')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "modules"
@@ -372,7 +411,7 @@
             type="button"
             (click)="runPipeline('grades')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "grades"
@@ -384,7 +423,7 @@
             type="button"
             (click)="runPipeline('quizzes')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "quizzes"
@@ -396,7 +435,7 @@
             type="button"
             (click)="runPipeline('surveys')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "surveys"
@@ -408,7 +447,7 @@
             type="button"
             (click)="runPipeline('full')"
             [disabled]="pipelineRunning"
-            class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{
               pipelineRunning && pipelineKind === "full"
@@ -418,9 +457,7 @@
           </button>
         </div>
       </div>
-      <div
-        class="rounded border border-slate-200 bg-slate-950/90 p-4 text-xs text-slate-100"
-      >
+      <div class="rounded-3xl border border-slate-200/70 bg-slate-950/95 p-4 text-xs text-slate-100">
         <div *ngIf="pipelineError" class="mb-2 text-rose-300">
           {{ pipelineError }}
         </div>
@@ -504,7 +541,7 @@
           >{{ recentEvents.length }} eventos</span
         >
       </div>
-      <div class="rounded border border-slate-200 bg-white px-4">
+       <div class="rounded-3xl border border-slate-200/80 bg-white px-4 shadow-sm">
         <app-event-row
           *ngFor="let event of recentEvents"
           [event]="event"

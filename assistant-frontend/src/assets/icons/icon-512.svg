@@ -1,0 +1,5 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="120" fill="#2563EB"/>
+  <rect x="56" y="56" width="400" height="400" rx="96" fill="#1D4ED8"/>
+  <text x="50%" y="54%" text-anchor="middle" fill="white" font-family="'Plus Jakarta Sans', sans-serif" font-size="160" font-weight="700">MW</text>
+</svg>

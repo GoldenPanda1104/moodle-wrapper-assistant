@@ -14,11 +14,12 @@ import { MoodleGradeService } from '../../core/services/moodle-grade.service';
 import { MoodleSurvey } from '../../core/models/moodle-survey.model';
 import { MoodleGradeItem } from '../../core/models/moodle-grade-item.model';
 import { MoodleCourse } from '../../core/models/moodle-course.model';
+import { ChartModule } from 'primeng/chart';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [DatePipe, NgFor, NgIf, TaskCardComponent, EventRowComponent],
+  imports: [DatePipe, NgFor, NgIf, TaskCardComponent, EventRowComponent, ChartModule],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
@@ -48,6 +49,12 @@ export class DashboardComponent {
   isLoading = true;
   isRefreshing = false;
   lastUpdated: Date | null = null;
+  chartWorkloadData: object | null = null;
+  chartWorkloadOptions: object | null = null;
+  chartDistributionData: object | null = null;
+  chartDistributionOptions: object | null = null;
+  chartDueData: object | null = null;
+  chartDueOptions: object | null = null;
 
   ngOnInit(): void {
     this.loadData();
@@ -175,6 +182,7 @@ export class DashboardComponent {
             })
             .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
             .slice(0, 6);
+          this.setChartData();
           this.isLoading = false;
           this.isRefreshing = false;
           this.lastUpdated = new Date();
@@ -184,6 +192,133 @@ export class DashboardComponent {
           this.isRefreshing = false;
         }
       });
+  }
+
+  private setChartData(): void {
+    const pendingTotal =
+      this.pendingSurveys.length +
+      this.pendingAssignments.length +
+      this.pendingQuizzes.length;
+    const upcomingTotal = this.upcomingAssignments.length + this.upcomingQuizzes.length;
+
+    this.chartWorkloadData = {
+      labels: ['Encuestas', 'Tareas', 'Quizzes', 'Proximas'],
+      datasets: [
+        {
+          label: 'Pendientes',
+          data: [
+            this.pendingSurveys.length,
+            this.pendingAssignments.length,
+            this.pendingQuizzes.length,
+            upcomingTotal,
+          ],
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.15)',
+          pointBackgroundColor: '#1d4ed8',
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    };
+    this.chartWorkloadOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+        },
+        y: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8', font: { size: 11 }, precision: 0 },
+        },
+      },
+    };
+
+    this.chartDistributionData = {
+      labels: ['Pendientes', 'Proximas', 'Bloqueadas', 'Hoy'],
+      datasets: [
+        {
+          data: [pendingTotal, upcomingTotal, this.blockedTasks.length, this.todayTasks.length],
+          backgroundColor: ['#2563eb', '#22c55e', '#f97316', '#0ea5e9'],
+          hoverBackgroundColor: ['#1d4ed8', '#16a34a', '#ea580c', '#0284c7'],
+          borderWidth: 0,
+        },
+      ],
+    };
+    this.chartDistributionOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#64748b', boxWidth: 10, boxHeight: 10 },
+        },
+      },
+    };
+
+    const nextDays = this.buildNextDays(7);
+    const dueCounts = nextDays.map((day) =>
+      this.countDueForDate(day.date)
+    );
+    this.chartDueData = {
+      labels: nextDays.map((day) => day.label),
+      datasets: [
+        {
+          label: 'Vencimientos',
+          data: dueCounts,
+          backgroundColor: 'rgba(37, 99, 235, 0.18)',
+          borderColor: '#2563eb',
+          borderRadius: 12,
+          borderWidth: 1,
+        },
+      ],
+    };
+    this.chartDueOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+        },
+        y: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8', font: { size: 11 }, precision: 0 },
+        },
+      },
+    };
+  }
+
+  private buildNextDays(days: number): Array<{ date: Date; label: string }> {
+    const formatter = new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric' });
+    return Array.from({ length: days }).map((_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() + index);
+      return {
+        date,
+        label: formatter.format(date).replace('.', ''),
+      };
+    });
+  }
+
+  private countDueForDate(date: Date): number {
+    const target = date.toDateString();
+    const assignments = this.upcomingAssignments.filter((item) =>
+      item.due_at ? new Date(item.due_at).toDateString() === target : false
+    );
+    const quizzes = this.upcomingQuizzes.filter((item) =>
+      item.due_at ? new Date(item.due_at).toDateString() === target : false
+    );
+    return assignments.length + quizzes.length;
   }
 
   formatCourseName(course?: MoodleCourse | null): string {

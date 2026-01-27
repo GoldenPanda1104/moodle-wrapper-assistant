@@ -1,29 +1,20 @@
 <section class="space-y-6">
-  <header
-    class="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between"
-  >
-    <div class="space-y-2">
-      <div
-        class="text-[12px] font-mono uppercase tracking-[0.2em] text-slate-500"
-      >
-        Moodle
-      </div>
-      <h1 class="text-2xl font-semibold text-slate-900">Cursos</h1>
-      <p class="text-sm text-slate-600">
-        Listado de cursos detectados en Moodle con su estado de sincronizacion.
+  <header class="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <div class="text-[12px] uppercase tracking-[0.3em] text-slate-400">Moodle</div>
+      <h1 class="mt-2 text-2xl font-semibold text-slate-900">Cursos</h1>
+      <p class="text-sm text-slate-500">
+        Listado de cursos detectados con estado de sincronizacion y acciones rapidas.
       </p>
     </div>
-    <div class="flex items-center gap-3">
-      <div
-        class="text-[11px] uppercase tracking-wide text-slate-500"
-        *ngIf="lastUpdated"
-      >
+    <div class="flex flex-wrap items-center gap-3">
+      <div *ngIf="lastUpdated" class="rounded-full bg-slate-50 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-500">
         Actualizado {{ lastUpdated | date: "HH:mm:ss" }}
       </div>
       <button
         type="button"
         (click)="refresh()"
-        class="inline-flex items-center rounded border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900"
+        class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-slate-800"
       >
         Actualizar
       </button>
@@ -32,7 +23,7 @@
 
   <div
     *ngIf="isLoading"
-    class="rounded border border-slate-200 bg-white p-6 text-sm text-slate-600"
+    class="rounded-3xl border border-slate-200/80 bg-white p-6 text-sm text-slate-600 shadow-sm"
   >
     Cargando cursos...
   </div>
@@ -47,7 +38,7 @@
     <div class="space-y-3">
       <article
         *ngFor="let course of courses"
-        class="rounded border border-slate-200 bg-white p-4 shadow-sm"
+        class="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm"
       >
         <div
           class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
@@ -68,7 +59,7 @@
               type="button"
               (click)="completeAllSurveys(course)"
               [disabled]="completing.has(course.id)"
-              class="inline-flex items-center rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              class="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{
                 completing.has(course.id)
@@ -87,7 +78,7 @@
       </article>
       <div
         *ngIf="courses.length === 0"
-        class="rounded border border-dashed border-slate-300 p-4 text-sm text-slate-500"
+        class="rounded-3xl border border-dashed border-slate-300 p-6 text-sm text-slate-500"
       >
         No hay cursos disponibles aun.
       </div>
