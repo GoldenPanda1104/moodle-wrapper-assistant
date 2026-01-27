@@ -4,6 +4,9 @@ import { AuthService } from '../../core/services/auth.service';
 import { MoodleVaultService, VaultStatus } from '../../core/services/moodle-vault.service';
 import { Router } from '@angular/router';
 import { NgIf } from '@angular/common';
+import { NotificationService } from '../../core/services/notification.service';
+import { NotificationPreferences } from '../../core/models/notification.model';
+import { OneSignalService } from '../../core/services/onesignal.service';
 
 @Component({
   selector: 'app-settings',
@@ -16,6 +19,8 @@ export class SettingsComponent implements OnInit {
     private readonly fb: FormBuilder,
     private readonly vault: MoodleVaultService,
     private readonly auth: AuthService,
+    private readonly notifications: NotificationService,
+    private readonly oneSignal: OneSignalService,
     private readonly router: Router,
   ) {}
 
@@ -24,6 +29,7 @@ export class SettingsComponent implements OnInit {
   errorMessage = '';
   loading = false;
   cronLoading = false;
+  prefsLoading = false;
 
   form = this.fb.group({
     moodle_username: ['', Validators.required],
@@ -35,8 +41,18 @@ export class SettingsComponent implements OnInit {
     app_password: ['', Validators.required]
   });
 
+  notificationForm = this.fb.group({
+    in_app_enabled: [true],
+    email_enabled: [true],
+    push_enabled: [true],
+    daily_digest_enabled: [true],
+    digest_hour: [8, Validators.required],
+    timezone: ['']
+  });
+
   ngOnInit(): void {
     this.refreshStatus();
+    this.loadPreferences();
   }
 
   refreshStatus(): void {
@@ -97,12 +113,56 @@ export class SettingsComponent implements OnInit {
     });
   }
 
+  loadPreferences(): void {
+    this.prefsLoading = true;
+    this.notifications.getPreferences().subscribe({
+      next: (prefs) => {
+        this.prefsLoading = false;
+        this.notificationForm.patchValue(prefs);
+      },
+      error: () => {
+        this.prefsLoading = false;
+      }
+    });
+  }
+
+  savePreferences(): void {
+    if (this.notificationForm.invalid || this.prefsLoading) {
+      return;
+    }
+    this.prefsLoading = true;
+    this.message = '';
+    this.errorMessage = '';
+    const raw = this.notificationForm.getRawValue();
+    const digestHour = Number(raw.digest_hour);
+    const payload: NotificationPreferences = {
+      in_app_enabled: Boolean(raw.in_app_enabled),
+      email_enabled: Boolean(raw.email_enabled),
+      push_enabled: Boolean(raw.push_enabled),
+      daily_digest_enabled: Boolean(raw.daily_digest_enabled),
+      digest_hour: Number.isFinite(digestHour) ? digestHour : 8,
+      timezone: raw.timezone ? String(raw.timezone) : null,
+    };
+    this.notifications.updatePreferences(payload).subscribe({
+      next: () => {
+        this.prefsLoading = false;
+        this.message = 'Preferencias de notificacion actualizadas.';
+      },
+      error: () => {
+        this.prefsLoading = false;
+        this.errorMessage = 'No pudimos guardar las preferencias.';
+      }
+    });
+  }
+
   logout(): void {
     this.auth.logout().subscribe({
       next: () => {
+        this.oneSignal.logout();
         this.router.navigate(['/login']);
       },
       error: () => {
+        this.oneSignal.logout();
         this.router.navigate(['/login']);
       }
     });
