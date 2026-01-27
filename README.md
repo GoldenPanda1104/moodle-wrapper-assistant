@@ -14,7 +14,7 @@ It includes a Python/FastAPI backend and a frontend client.
 1. Copy environment template and fill it in:
 
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
 2. Run the stack:
@@ -30,7 +30,7 @@ docker compose up --build
 
 ## Environment variables
 
-Backend reads these variables (see `backend/.env.example`):
+Backend reads these variables (see `.env.example`):
 
 - `PROJECT_NAME`
 - `DATABASE_URL`

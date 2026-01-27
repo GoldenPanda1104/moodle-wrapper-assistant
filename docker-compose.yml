@@ -16,14 +16,17 @@ services:
   backend:
     build:
       context: ./backend
-    env_file:
-      - ./backend/.env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PROJECT_NAME: ${PROJECT_NAME}
       MOODLE_BASE_URL: ${MOODLE_BASE_URL}
+      MOODLE_USERNAME: ${MOODLE_USERNAME}
+      MOODLE_PASSWORD: ${MOODLE_PASSWORD}
       SERVER_MASTER_KEY: ${SERVER_MASTER_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
       APP_TIMEZONE: ${APP_TIMEZONE}
       MAILERSEND_API_KEY: ${MAILERSEND_API_KEY}
       MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL}
@@ -33,7 +36,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health').read()"]
@@ -48,7 +52,8 @@ services:
     ports:
       - "4200:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1"]
       interval: 15s
