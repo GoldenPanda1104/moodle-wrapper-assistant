@@ -1,0 +1,9 @@
+.notification-card {
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.notification-card.unread {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 16px 30px -24px rgba(37, 99, 235, 0.5);
+}

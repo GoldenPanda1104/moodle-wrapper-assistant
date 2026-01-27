@@ -66,6 +66,10 @@ export class AuthService {
     return Boolean(this.getAccessToken());
   }
 
+  clearSession(): void {
+    this.clearTokens();
+  }
+
   private storeTokens(response: AuthResponse): void {
     localStorage.setItem(this.accessKey, response.access_token);
     localStorage.setItem(this.refreshKey, response.refresh_token);
