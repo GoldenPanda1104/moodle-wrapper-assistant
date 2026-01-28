@@ -106,12 +106,10 @@ Notes:
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
 - **404 on `/login`, `/favicon.ico`, or other SPA routes:** (1) Comprueba que en
-  **Domains** el destino sea **frontend** y puerto **80**. (2) Si ya lo está, es
-  probable que la regla generada sea solo para la ruta exacta `/`. Añade en
-  **Variables de entorno** la variable **`DOMAIN`** con el mismo valor que el
-  dominio (ej. `suantechs-study-b4xltb-c19882-168-231-73-220.traefik.me` o
-  `study.suantechs.com`), guarda y redespliega. El compose define una regla
-  Traefik `PathPrefix(\`/\`)` para que todas las rutas vayan al frontend.
+  **Domains** el destino sea **frontend** y puerto **80**. (2) El compose incluye
+  una regla Traefik `PathPrefix(\`/\`)` para `*.traefik.me` y `*.suantechs.com`;
+  tras mergear y redesplegar, `/login` y el resto de rutas deben ir al frontend.
+  Si usas otro dominio, hay que añadirlo a la regla en `docker-compose.yml`.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
 ## Development

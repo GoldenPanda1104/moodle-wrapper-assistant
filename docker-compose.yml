@@ -60,9 +60,9 @@ services:
       - backend
     labels:
       # PathPrefix(`/`) hace que /, /login, /favicon.ico, etc. vayan al frontend.
-      # Si en Domains "Path: /" hace que solo / responda, define DOMAIN y redespliega.
+      # HostRegexp para *.traefik.me y *.suantechs.com sin depender de variable DOMAIN.
       - "traefik.enable=true"
-      - "traefik.http.routers.suantechs-frontend.rule=Host(`${DOMAIN:-localhost}`);PathPrefix(`/`)"
+      - "traefik.http.routers.suantechs-frontend.rule=(HostRegexp(`^[a-z0-9.-]+\\.traefik\\.me$`) || HostRegexp(`^[a-z0-9.-]+\\.suantechs\\.com$`));PathPrefix(`/`)"
       - "traefik.http.routers.suantechs-frontend.service=suantechs-frontend"
       - "traefik.http.routers.suantechs-frontend.priority=100"
       - "traefik.http.routers.suantechs-frontend.entrypoints=web"
