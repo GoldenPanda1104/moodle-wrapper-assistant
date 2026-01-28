@@ -60,11 +60,11 @@ services:
       - backend
     labels:
       # PathPrefix(`/`) hace que /, /login, /favicon.ico, etc. vayan al frontend.
-      # HostRegexp para *.traefik.me y *.suantechs.com sin depender de variable DOMAIN.
+      # Host exactos (sin regex) para evitar 404 cuando Dokploy inyecta Path(/).
       - "traefik.enable=true"
-      - "traefik.http.routers.suantechs-frontend.rule=(HostRegexp(`^[a-z0-9.-]+\\.traefik\\.me$`) || HostRegexp(`^[a-z0-9.-]+\\.suantechs\\.com$`));PathPrefix(`/`)"
+      - "traefik.http.routers.suantechs-frontend.rule=Host(`suantechs-study-b4xltb-c19882-168-231-73-220.traefik.me`,`study.suantechs.com`) && PathPrefix(`/`)"
       - "traefik.http.routers.suantechs-frontend.service=suantechs-frontend"
-      - "traefik.http.routers.suantechs-frontend.priority=100"
+      - "traefik.http.routers.suantechs-frontend.priority=200"
       - "traefik.http.routers.suantechs-frontend.entrypoints=web,websecure"
       - "traefik.http.services.suantechs-frontend.loadbalancer.server.port=80"
     healthcheck:
