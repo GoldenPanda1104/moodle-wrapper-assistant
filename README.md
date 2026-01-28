@@ -57,10 +57,12 @@ container managed by Dokploy. The compose file does **not** require a `.env`
 file; all values come from environment variables (with defaults where applicable).
 
 1. Create a new Docker Compose app in Dokploy and point it to this repo.
-2. In the app’s **Environment variables** (or “Env” section), set the variables
+2. In the **Domains** tab, add your domain and assign it to the **frontend** service with port **80**.  
+   All traffic (/, /login, /api/…) must go to the frontend; it serves the SPA and proxies `/api/` to the backend. If the domain points to the backend, you will get `404` on `/login`, `/favicon.ico`, etc.
+3. In the app’s **Environment variables** (or “Env” section), set the variables
    listed below so they are available when `docker compose` runs. Do not rely
    on a `backend/.env` or `.env` file in the repo.
-3. Deploy the stack.
+4. Deploy the stack.
 
 Recommended environment variables for Dokploy:
 
@@ -103,6 +105,13 @@ Notes:
   or not on the same Docker network—often because required env vars were missing
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
+- **404 on `/login`, `/favicon.ico`, or other SPA routes:** (1) Comprueba que en
+  **Domains** el destino sea **frontend** y puerto **80**. (2) Si ya lo está, es
+  probable que la regla generada sea solo para la ruta exacta `/`. Añade en
+  **Variables de entorno** la variable **`DOMAIN`** con el mismo valor que el
+  dominio (ej. `suantechs-study-b4xltb-c19882-168-231-73-220.traefik.me` o
+  `study.suantechs.com`), guarda y redespliega. El compose define una regla
+  Traefik `PathPrefix(\`/\`)` para que todas las rutas vayan al frontend.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
 ## Development
