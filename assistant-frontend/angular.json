@@ -28,9 +28,7 @@
             "assets": [
               "src/favicon.ico",
               "src/assets",
-              "src/manifest.webmanifest",
-              "src/OneSignalSDKWorker.js",
-              "src/OneSignalSDKUpdaterWorker.js"
+              "src/manifest.webmanifest"
             ],
             "styles": [
               "node_modules/primeng/resources/themes/lara-light-blue/theme.css",
