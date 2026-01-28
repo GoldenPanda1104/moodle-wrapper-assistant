@@ -11,13 +11,15 @@ It includes a Python/FastAPI backend and a frontend client.
 
 ## Quick start (Docker)
 
-1. Copy environment template and fill it in:
+1. Copia la plantilla de entorno en la **raíz del proyecto** y relléna la que necesites. Docker Compose carga ese `.env` solo por estar en la misma carpeta que `docker-compose.yml` (no hace falta `env_file`):
 
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
-2. Run the stack:
+   Si no creas `.env`, el compose usa valores por defecto válidos para desarrollo (Postgres en `db:5432`, etc.).
+
+2. Levanta el stack:
 
 ```bash
 docker compose up --build
@@ -51,10 +53,13 @@ Backend reads these variables (see `backend/.env.example`):
 ## Deploy on Dokploy (Docker Compose)
 
 This project is designed to run with `docker-compose.yml` and a Postgres
-container managed by Dokploy.
+container managed by Dokploy. The compose file does **not** require a `.env`
+file; all values come from environment variables (with defaults where applicable).
 
 1. Create a new Docker Compose app in Dokploy and point it to this repo.
-2. Set the required environment variables for the backend service.
+2. In the app’s **Environment variables** (or “Env” section), set the variables
+   listed below so they are available when `docker compose` runs. Do not rely
+   on a `backend/.env` or `.env` file in the repo.
 3. Deploy the stack.
 
 Recommended environment variables for Dokploy:
@@ -93,7 +98,11 @@ Health checks:
 
 Notes:
 
-- The frontend proxies `/api/` to the backend service inside Docker.
+- The frontend proxies `/api/` to the backend service inside Docker. If you see
+  `502` or “backend could not be resolved”, the backend container is not running
+  or not on the same Docker network—often because required env vars were missing
+  at deploy time. Ensure all variables are set in Dokploy and that the backend
+  service starts successfully.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
 ## Development
