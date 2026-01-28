@@ -65,7 +65,7 @@ services:
       - "traefik.http.routers.suantechs-frontend.rule=(HostRegexp(`^[a-z0-9.-]+\\.traefik\\.me$`) || HostRegexp(`^[a-z0-9.-]+\\.suantechs\\.com$`));PathPrefix(`/`)"
       - "traefik.http.routers.suantechs-frontend.service=suantechs-frontend"
       - "traefik.http.routers.suantechs-frontend.priority=100"
-      - "traefik.http.routers.suantechs-frontend.entrypoints=web"
+      - "traefik.http.routers.suantechs-frontend.entrypoints=web,websecure"
       - "traefik.http.services.suantechs-frontend.loadbalancer.server.port=80"
     healthcheck:
       test:
