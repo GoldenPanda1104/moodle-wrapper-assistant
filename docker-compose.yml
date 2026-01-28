@@ -16,19 +16,17 @@ services:
   backend:
     build:
       context: ./backend
-    env_file:
-      - ./backend/.env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      PROJECT_NAME: ${PROJECT_NAME}
-      MOODLE_BASE_URL: ${MOODLE_BASE_URL}
-      SERVER_MASTER_KEY: ${SERVER_MASTER_KEY}
-      JWT_SECRET: ${JWT_SECRET}
-      APP_TIMEZONE: ${APP_TIMEZONE}
-      MAILERSEND_API_KEY: ${MAILERSEND_API_KEY}
-      MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL}
-      MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME}
-      MAILERSEND_TO_EMAIL: ${MAILERSEND_TO_EMAIL}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/assistant}
+      PROJECT_NAME: ${PROJECT_NAME:-Moodle Wrapper}
+      MOODLE_BASE_URL: ${MOODLE_BASE_URL:-}
+      SERVER_MASTER_KEY: ${SERVER_MASTER_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Panama}
+      MAILERSEND_API_KEY: ${MAILERSEND_API_KEY:-}
+      MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL:-}
+      MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME:-Moodle Wrapper}
+      MAILERSEND_TO_EMAIL: ${MAILERSEND_TO_EMAIL:-}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
