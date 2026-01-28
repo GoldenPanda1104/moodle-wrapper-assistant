@@ -58,13 +58,17 @@ file; all values come from environment variables (with defaults where applicable
 
 1. Create a new Docker Compose app in Dokploy and point it to this repo.
 2. In the **Domains** tab, add your domain and assign it to the **`frontend`** service with port **`80`**.
-   Dokploy generates the Traefik router automatically — do **not** add custom
-   Traefik labels in `docker-compose.yml` (they create a second router that
-   conflicts with Dokploy's and causes 404s on SPA routes).
-   All traffic (`/`, `/login`, `/api/…`) must reach the frontend container;
-   Nginx inside it serves the Angular SPA and proxies `/api/` to the backend.
-   If you accidentally assign the domain to the **backend** service, you will
-   get `404` on `/login`, `/favicon.ico`, and every SPA route.
+   - **Protocol**: set to **HTTPS** (not HTTP).
+   - **Certificate**: select **Let's Encrypt** so Traefik creates a router on the
+     `websecure` entrypoint. With HTTP + "Cert: none" Traefik only creates a `web`
+     (port 80) router; if the server has a global HTTP→HTTPS redirect (default in
+     Dokploy), every request is redirected to HTTPS where no router exists → **404**.
+   - Do **not** add custom Traefik labels in `docker-compose.yml` — Dokploy
+     generates its own router and having two for the same host causes conflicts.
+   - All traffic (`/`, `/login`, `/api/…`) must reach the frontend container;
+     Nginx inside it serves the Angular SPA and proxies `/api/` to the backend.
+   - If you assign the domain to the **backend** service instead, you will see
+     `404` on `/login`, `/favicon.ico`, and every other SPA route.
 3. In the app's **Environment variables** (or "Env" section), set the variables
    listed below so they are available when `docker compose` runs. Do not rely
    on a `backend/.env` or `.env` file in the repo.
@@ -112,12 +116,14 @@ Notes:
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
 - **404 en `/login`, `/favicon.ico` o rutas de la SPA:**
-  (1) En **Domains** el destino debe ser **`frontend`** y puerto **`80`**.
-  (2) No añadas labels Traefik manuales en `docker-compose.yml`. Dokploy
-  genera su propio router; tener dos routers para el mismo host causa
-  conflictos y 404.
-  (3) Si tras desplegar sigues viendo 404, en **Domains** quita el dominio,
-  despliega, y vuelve a añadirlo para que Dokploy regenere el router limpio.
+  (1) En **Domains** el destino debe ser **`frontend`**, puerto **`80`**,
+  protocolo **HTTPS** y certificado **Let's Encrypt**.
+  Con HTTP + "Cert: none", Traefik solo crea un router en `web` (port 80);
+  si hay redirect global HTTP→HTTPS (default en Dokploy), todas las
+  peticiones terminan en `websecure` sin router → 404.
+  (2) No añadas labels Traefik manuales en `docker-compose.yml`.
+  (3) Si tras desplegar sigues viendo 404, quita los dominios, despliega,
+  y vuelve a añadirlos para que Dokploy regenere los routers.
   (4) La rama que despliega (p. ej. `main`) debe tener este `docker-compose.yml`.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
