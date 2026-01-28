@@ -57,9 +57,15 @@ container managed by Dokploy. The compose file does **not** require a `.env`
 file; all values come from environment variables (with defaults where applicable).
 
 1. Create a new Docker Compose app in Dokploy and point it to this repo.
-2. In the **Domains** tab, add your domain and assign it to the **frontend** service with port **80**.  
-   All traffic (/, /login, /api/…) must go to the frontend; it serves the SPA and proxies `/api/` to the backend. If the domain points to the backend, you will get `404` on `/login`, `/favicon.ico`, etc.
-3. In the app’s **Environment variables** (or “Env” section), set the variables
+2. In the **Domains** tab, add your domain and assign it to the **`frontend`** service with port **`80`**.
+   Dokploy generates the Traefik router automatically — do **not** add custom
+   Traefik labels in `docker-compose.yml` (they create a second router that
+   conflicts with Dokploy's and causes 404s on SPA routes).
+   All traffic (`/`, `/login`, `/api/…`) must reach the frontend container;
+   Nginx inside it serves the Angular SPA and proxies `/api/` to the backend.
+   If you accidentally assign the domain to the **backend** service, you will
+   get `404` on `/login`, `/favicon.ico`, and every SPA route.
+3. In the app's **Environment variables** (or "Env" section), set the variables
    listed below so they are available when `docker compose` runs. Do not rely
    on a `backend/.env` or `.env` file in the repo.
 4. Deploy the stack.
@@ -105,18 +111,13 @@ Notes:
   or not on the same Docker network—often because required env vars were missing
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
-- **404 en `/login`, `/favicon.ico` o rutas de la SPA:**  
-  (1) En **Domains** el destino debe ser **frontend** y puerto **80**.  
-  (2) El compose define una regla Traefik  
-  `Host(\`…traefik.me\`,\`study.suantechs.com\`) && PathPrefix(\`/\`)`  
-  con `priority=999` (muy alta) y `entrypoints=web,websecure`.  
-  (3) En Dokploy, usa **Preview Compose** y comprueba que el servicio `frontend`  
-  tiene las labels `traefik.http.routers.suantechs-frontend.*` con `priority=999`.  
-  Si ves routers de Dokploy (ej. `suantechs-study-b4xltb-*-web`) **sin**  
-  `PathPrefix` y siguen dando 404, Dokploy está generando routers que ganan  
-  a pesar de la prioridad. **Solución:** En la pestaña **Domains**, **quita**  
-  los dominios, despliega, y luego vuelve a añadirlos. O configura los dominios  
-  con "Path" vacío o "/*" si Dokploy lo permite.  
+- **404 en `/login`, `/favicon.ico` o rutas de la SPA:**
+  (1) En **Domains** el destino debe ser **`frontend`** y puerto **`80`**.
+  (2) No añadas labels Traefik manuales en `docker-compose.yml`. Dokploy
+  genera su propio router; tener dos routers para el mismo host causa
+  conflictos y 404.
+  (3) Si tras desplegar sigues viendo 404, en **Domains** quita el dominio,
+  despliega, y vuelve a añadirlo para que Dokploy regenere el router limpio.
   (4) La rama que despliega (p. ej. `main`) debe tener este `docker-compose.yml`.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 

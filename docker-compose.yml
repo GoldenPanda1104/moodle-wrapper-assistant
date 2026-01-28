@@ -58,16 +58,10 @@ services:
       - "4200:80"
     depends_on:
       - backend
-    labels:
-      # PathPrefix(`/`) hace que /, /login, /favicon.ico, etc. vayan al frontend.
-      # Dokploy genera routers sin PathPrefix (solo Host), así que creamos uno con priority muy alta.
-      - "traefik.enable=true"
-      # Router con PathPrefix y prioridad máxima para que Traefik lo use antes que los de Dokploy
-      - "traefik.http.routers.suantechs-frontend.rule=Host(`suantechs-study-b4xltb-c19882-168-231-73-220.traefik.me`,`study.suantechs.com`) && PathPrefix(`/`)"
-      - "traefik.http.routers.suantechs-frontend.service=suantechs-frontend"
-      - "traefik.http.routers.suantechs-frontend.priority=999"
-      - "traefik.http.routers.suantechs-frontend.entrypoints=web,websecure"
-      - "traefik.http.services.suantechs-frontend.loadbalancer.server.port=80"
+    # No Traefik labels here — Dokploy manages routing via its Domains tab.
+    # Adding labels here creates a SECOND Traefik router that conflicts with
+    # the one Dokploy auto-generates, causing 404s on SPA routes.
+    # Configure the domain in Dokploy → Domains → frontend service, port 80.
     healthcheck:
       test:
         ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1"]
