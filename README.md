@@ -105,11 +105,13 @@ Notes:
   or not on the same Docker network—often because required env vars were missing
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
-- **404 on `/login`, `/favicon.ico`, or other SPA routes:** (1) Comprueba que en
-  **Domains** el destino sea **frontend** y puerto **80**. (2) El compose incluye
-  una regla Traefik `PathPrefix(\`/\`)` para `*.traefik.me` y `*.suantechs.com`;
-  tras mergear y redesplegar, `/login` y el resto de rutas deben ir al frontend.
-  Si usas otro dominio, hay que añadirlo a la regla en `docker-compose.yml`.
+- **404 on `/login`, `/favicon.ico`, o rutas de la SPA:** (1) En **Domains** el
+  destino debe ser **frontend** y puerto **80**. (2) El compose tiene reglas
+  Traefik `PathPrefix(\`/\`)` para `*.traefik.me` y `*.suantechs.com` con
+  `entrypoints=web,websecure`. (3) **La rama que despliega Dokploy** (p. ej.
+  `main`) debe incluir esos cambios: haz merge de `fix/dokploy-prod-deploy` en
+  `main`, luego redeploy. Si el último deploy se hizo con un merge antiguo, main
+  puede no tener aún las reglas y seguirás con 404.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
 ## Development
