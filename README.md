@@ -109,10 +109,14 @@ Notes:
   (1) En **Domains** el destino debe ser **frontend** y puerto **80**.  
   (2) El compose define una regla Traefik  
   `Host(\`…traefik.me\`,\`study.suantechs.com\`) && PathPrefix(\`/\`)`  
-  con `priority=200` y `entrypoints=web,websecure`.  
+  con `priority=999` (muy alta) y `entrypoints=web,websecure`.  
   (3) En Dokploy, usa **Preview Compose** y comprueba que el servicio `frontend`  
-  conserva las labels `traefik.http.routers.suantechs-frontend.*`. Si en el  
-  preview no aparecen, Dokploy está sobrescribiendo las labels del servicio.  
+  tiene las labels `traefik.http.routers.suantechs-frontend.*` con `priority=999`.  
+  Si ves routers de Dokploy (ej. `suantechs-study-b4xltb-*-web`) **sin**  
+  `PathPrefix` y siguen dando 404, Dokploy está generando routers que ganan  
+  a pesar de la prioridad. **Solución:** En la pestaña **Domains**, **quita**  
+  los dominios, despliega, y luego vuelve a añadirlos. O configura los dominios  
+  con "Path" vacío o "/*" si Dokploy lo permite.  
   (4) La rama que despliega (p. ej. `main`) debe tener este `docker-compose.yml`.
 - If you expose the backend directly, expect `404` on `/` (use `/health`).
 
