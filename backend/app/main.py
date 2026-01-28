@@ -10,7 +10,10 @@ from app.services.scheduler import start_scheduler, stop_scheduler
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
+# Rutas bajo /api/v1 (cuando el tráfico pasa por el frontend nginx o el proxy no modifica el path)
 app.include_router(api_router, prefix="/api/v1")
+# Rutas bajo /v1 por si Traefik u otro proxy enruta /api/* al backend quitando el prefijo /api
+app.include_router(api_router, prefix="/v1")
 
 @app.on_event("startup")
 def on_startup() -> None:
