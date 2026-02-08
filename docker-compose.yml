@@ -10,7 +10,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,20 +36,9 @@ services:
       - app-network
     depends_on:
       - db
-    command:
-      [
-        "sh",
-        "-c",
-        "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000",
-      ]
+    command: [ "sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000" ]
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request as u; u.urlopen('http://localhost:8000/health').read()",
-        ]
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health').read()" ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -59,16 +48,13 @@ services:
       context: ./assistant-frontend
       dockerfile: Dockerfile
     ports:
-      - "4200:80"
-    # Explicit app-network keeps frontend connected to backend/db even after
-    # Dokploy appends dokploy-network for Traefik routing.
+      - "52052:80"
     networks:
       - app-network
     depends_on:
       - backend
     healthcheck:
-      test:
-        ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 5

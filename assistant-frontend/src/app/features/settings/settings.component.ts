@@ -31,6 +31,11 @@ export class SettingsComponent implements OnInit {
   cronLoading = false;
   prefsLoading = false;
 
+  /** API key de ingest: solo se muestra una vez tras generarla */
+  generatedApiKey: string | null = null;
+  ingestKeyLoading = false;
+  ingestKeyError = '';
+
   form = this.fb.group({
     moodle_username: ['', Validators.required],
     moodle_password: ['', Validators.required],
@@ -153,6 +158,34 @@ export class SettingsComponent implements OnInit {
         this.errorMessage = 'No pudimos guardar las preferencias.';
       }
     });
+  }
+
+  generateIngestKey(): void {
+    this.ingestKeyLoading = true;
+    this.ingestKeyError = '';
+    this.generatedApiKey = null;
+    this.vault.createIngestKey().subscribe({
+      next: (res) => {
+        this.ingestKeyLoading = false;
+        this.generatedApiKey = res.api_key ?? null;
+        this.message = res.message ?? 'Guarda la clave en un lugar seguro; no se volvera a mostrar.';
+      },
+      error: () => {
+        this.ingestKeyLoading = false;
+        this.ingestKeyError = 'No se pudo generar la API key.';
+      }
+    });
+  }
+
+  copyIngestKeyToClipboard(): void {
+    if (!this.generatedApiKey) return;
+    void navigator.clipboard.writeText(this.generatedApiKey);
+    this.message = 'Clave copiada al portapapeles.';
+  }
+
+  clearGeneratedKey(): void {
+    this.generatedApiKey = null;
+    this.ingestKeyError = '';
   }
 
   logout(): void {

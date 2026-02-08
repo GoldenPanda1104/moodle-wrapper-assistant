@@ -1,0 +1,152 @@
+{
+  "project": "Swagger (OpenAPI) y modelo event-driven para documentación y modularidad",
+  "overview": "Documentar la API con Swagger/OpenAPI y evolucionar a un modelo event-driven in-process (sin RabbitMQ) con actions/filters tipo WordPress, webhooks, correo y push notifications sobre la data fetcheada, respetando el contrato de datos.",
+  "doc_ref": "docs/plan-swagger-y-event-driven.md",
+  "tasks": [
+    {
+      "id": "SW-1",
+      "title": "Metadatos OpenAPI en FastAPI",
+      "description": "Configurar en app/main.py metadatos: description, version, contact, license. Mantener openapi_url, docs_url, redoc_url.",
+      "type": "backend",
+      "dependencies": [],
+      "estimated_complexity": 1
+    },
+    {
+      "id": "SW-2",
+      "title": "Tags y agrupación por dominio",
+      "description": "Definir tags con descripción (auth, tasks, events, moodle, vault); revisar que Swagger UI agrupe bien las operaciones.",
+      "type": "backend",
+      "dependencies": ["SW-1"],
+      "estimated_complexity": 1
+    },
+    {
+      "id": "SW-3",
+      "title": "Descripciones y ejemplos en endpoints",
+      "description": "Añadir summary y response_description en endpoints críticos; añadir example/examples en schemas Pydantic (MoodleIngestBody, etc.).",
+      "type": "backend",
+      "dependencies": ["SW-1"],
+      "estimated_complexity": 2
+    },
+    {
+      "id": "SW-4",
+      "title": "Esquemas de seguridad en OpenAPI",
+      "description": "Documentar en OpenAPI: Bearer JWT y ApiKey X-API-Key; asignar security por ruta.",
+      "type": "backend",
+      "dependencies": ["SW-1"],
+      "estimated_complexity": 2
+    },
+    {
+      "id": "SW-5",
+      "title": "Exportar y versionar openapi.json",
+      "description": "Script o endpoint para generar openapi.json; guardar en docs/openapi.json o docs/api/; documentar en README.",
+      "type": "backend",
+      "dependencies": ["SW-2", "SW-4"],
+      "estimated_complexity": 2
+    },
+    {
+      "id": "EV-1",
+      "title": "Definir contrato de eventos internos",
+      "description": "Documentar en docs/event-model.md eventos, payloads y cuándo se emiten; relación con contrato HTTP de ingest.",
+      "type": "docs",
+      "dependencies": [],
+      "estimated_complexity": 2
+    },
+    {
+      "id": "EV-2",
+      "title": "Implementar dispatcher de eventos en proceso",
+      "description": "Módulo app/core/events.py o app/services/event_bus.py: emit(event_name, payload), subscribe(event_name, handler); in-process, sin broker.",
+      "type": "backend",
+      "dependencies": [],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-3",
+      "title": "Emitir eventos desde el flujo de ingest",
+      "description": "En POST ingest: emitir MoodleIngestReceived, SnapshotApplied, DiffsProcessed en los momentos adecuados.",
+      "type": "backend",
+      "dependencies": ["EV-2"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-4",
+      "title": "Registrar handlers por defecto",
+      "description": "Lógica actual de ingest (upserts, save_snapshot, _handle_diff) como handlers de los eventos; un solo lugar para el contrato.",
+      "type": "backend",
+      "dependencies": ["EV-3"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-5",
+      "title": "Documentar extensión con nuevos handlers",
+      "description": "En docs/event-model.md explicar cómo añadir handlers (notificaciones, webhook) sin tocar endpoint ni contrato HTTP.",
+      "type": "docs",
+      "dependencies": ["EV-1", "EV-4"],
+      "estimated_complexity": 1
+    },
+    {
+      "id": "EV-6",
+      "title": "Soporte actions y filters en el dispatcher",
+      "description": "Extender eventos con do_action y apply_filters. Filters primero, luego actions. Documentar en event-model.md.",
+      "type": "backend",
+      "dependencies": ["EV-2", "EV-4"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-7",
+      "title": "Eventos granulares por tipo de diff",
+      "description": "Emitir desde _handle_diff: survey_detected, module_detected, module_unlocked, blocked_detected, grade_item_updated.",
+      "type": "backend",
+      "dependencies": ["EV-3", "EV-4", "EV-6"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-8",
+      "title": "Modelo y CRUD de webhooks",
+      "description": "Modelo webhook_endpoints: user_id, url, eventos, secret opcional, activo. CRUD protegido por JWT.",
+      "type": "backend",
+      "dependencies": ["EV-6", "EV-7"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-9",
+      "title": "Handler webhook (action)",
+      "description": "Action que POST a URLs registradas con payload estándar. Ejecución en background; opcional HMAC.",
+      "type": "backend",
+      "dependencies": ["EV-8"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-10",
+      "title": "Action de correo para eventos relevantes",
+      "description": "Correo ante survey_detected, module_unlocked, grade_item_updated. Mailer existente; plantillas; preferencias.",
+      "type": "backend",
+      "dependencies": ["EV-7"],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "EV-11",
+      "title": "Action de push notifications",
+      "description": "Push FCM/APNs según evento. Modelo tokens por usuario; credenciales; envío en background.",
+      "type": "backend",
+      "dependencies": ["EV-7"],
+      "estimated_complexity": 4
+    },
+    {
+      "id": "EV-12",
+      "title": "Documentar actions, filters y webhooks",
+      "description": "En event-model.md: eventos disponibles, registrar actions/filters, payload webhooks, config correo y push.",
+      "type": "docs",
+      "dependencies": ["EV-6", "EV-9", "EV-10"],
+      "estimated_complexity": 2
+    }
+  ],
+  "suggested_order_swagger": ["SW-1", "SW-2", "SW-3", "SW-4", "SW-5"],
+  "suggested_order_events": ["EV-1", "EV-2", "EV-3", "EV-4", "EV-5"],
+  "suggested_order_actions_webhooks": ["EV-6", "EV-7", "EV-8", "EV-9", "EV-10", "EV-11", "EV-12"],
+  "risks_and_notes": [
+    "Swagger y event-driven son independientes; pueden ejecutarse en paralelo.",
+    "Event-driven: sin RabbitMQ; do_action y apply_filters tipo WordPress para webhooks, correo y push.",
+    "Webhooks y notificaciones en background para no bloquear ingest.",
+    "Cualquier cliente externo sigue usando solo POST y contrato docs/moodle-ingest-spec.md."
+  ]
+}

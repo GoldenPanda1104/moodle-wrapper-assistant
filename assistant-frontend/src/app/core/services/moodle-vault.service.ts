@@ -26,4 +26,9 @@ export class MoodleVaultService {
   disableCron(): Observable<VaultStatus> {
     return this.api.post<VaultStatus>('/vault/disable-cron', {});
   }
+
+  /** Genera una API key para el endpoint de ingest (scraper en casa). Se muestra una sola vez. */
+  createIngestKey(): Observable<{ api_key: string; message: string }> {
+    return this.api.post<{ api_key: string; message: string }>('/moodle/ingest-key', {});
+  }
 }

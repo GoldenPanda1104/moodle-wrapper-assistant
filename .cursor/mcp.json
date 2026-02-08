@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "Atlassian": {
+      "url": "https://mcp.atlassian.com/v1/sse",
+      "headers": {}
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-52f26283-22ab-4a5e-962e-a77e660354c7"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
+}
