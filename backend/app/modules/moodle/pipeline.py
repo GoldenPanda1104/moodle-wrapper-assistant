@@ -10,6 +10,11 @@ import json
 
 from app.modules.moodle.adapters import get_adapter
 from app.modules.moodle.diff import diff_snapshots
+from app.modules.moodle.fetch import (
+    _fetch_modules,
+    _fetch_modules_by_ids,
+    _merge_survey_flags,
+)
 from app.modules.moodle.snapshot import get_last_snapshot, save_snapshot
 from app.modules.moodle.models import MoodleModule
 from app.models.moodle_course import MoodleCourse
@@ -202,6 +207,29 @@ def run_pipeline(db: Session, user_id: int) -> None:
     asyncio.run(async_run_pipeline(db, user_id))
 
 
+def apply_ingest_payload(db: Session, user_id: int, snapshot: dict, diffs: list[dict]) -> None:
+    """
+    Aplica un payload de ingest (snapshot + diffs) para un usuario.
+    Reutilizado por el endpoint POST /api/v1/moodle/ingest y por cualquier
+    fuente que envíe el contrato { user_id, snapshot, diffs }.
+    """
+    courses = snapshot.get("courses") or []
+    modules = snapshot.get("modules") or []
+    module_surveys = snapshot.get("module_surveys") or []
+    grade_items = snapshot.get("grade_items") or []
+
+    course_map = crud_moodle.upsert_courses(db, user_id, courses)
+    module_map = crud_moodle.upsert_modules(db, modules, course_map)
+    crud_moodle.upsert_module_surveys(db, module_surveys, module_map)
+    crud_moodle.upsert_grade_items(db, grade_items, course_map)
+
+    save_snapshot(user_id, snapshot)
+
+    for diff in diffs:
+        if isinstance(diff, dict) and diff.get("type"):
+            _handle_diff(db, diff, user_id)
+
+
 async def _load_or_sync_courses(db: Session, user_id: int, adapter) -> dict[str, MoodleCourse]:
     courses = crud_moodle.list_courses(db, user_id=user_id, limit=2000)
     if courses:
@@ -227,37 +255,3 @@ async def _build_adapter_from_vault(db: Session, user_id: int):
     return get_adapter(creds)
 
 
-async def _fetch_modules(adapter, courses: list) -> list[MoodleModule]:
-    modules: list[MoodleModule] = []
-    for course in courses:
-        modules.extend(await adapter.get_modules(course.id))
-    return modules
-
-
-async def _fetch_modules_by_ids(adapter, course_ids: list[str]) -> list[MoodleModule]:
-    modules: list[MoodleModule] = []
-    for course_id in course_ids:
-        modules.extend(await adapter.get_modules(course_id))
-    return modules
-
-
-def _merge_survey_flags(
-    modules: list[MoodleModule], surveys: list
-) -> list[MoodleModule]:
-    survey_map = {(survey.course_id, survey.module_id) for survey in surveys}
-    updated: list[MoodleModule] = []
-    for module in modules:
-        has_survey = (module.course_id, module.id) in survey_map
-        updated.append(
-            MoodleModule(
-                id=module.id,
-                course_id=module.course_id,
-                title=module.title,
-                visible=module.visible,
-                blocked=module.blocked,
-                block_reason=module.block_reason,
-                has_survey=has_survey,
-                url=module.url,
-            )
-        )
-    return updated

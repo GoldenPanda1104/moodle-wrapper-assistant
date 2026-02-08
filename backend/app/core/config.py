@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
     SERVER_MASTER_KEY: str = ""
 
+    # RabbitMQ (consumer moodle.ingest). Vacío = deshabilitado.
+    RABBITMQ_URL: str = ""
+    RABBITMQ_QUEUE: str = "moodle.ingest"
+
     class Config:
         env_file = ".env"
 

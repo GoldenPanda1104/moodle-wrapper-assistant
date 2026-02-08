@@ -70,6 +70,49 @@
         </button>
       </form>
     </section>
+
+    <section class="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Clave de ingest (scraper)</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        Para enviar datos desde un scraper en casa (Docker o script) necesitas una API key. Se genera una sola vez; guardala en el scraper como <code class="rounded bg-slate-100 px-1 text-xs">INGEST_API_KEY</code>.
+      </p>
+      <div class="mt-4 space-y-3">
+        <button
+          type="button"
+          (click)="generateIngestKey()"
+          [disabled]="ingestKeyLoading"
+          class="w-full rounded-full border border-slate-900 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white disabled:opacity-60"
+        >
+          {{ ingestKeyLoading ? 'Generando...' : 'Generar API key' }}
+        </button>
+        <ng-container *ngIf="generatedApiKey">
+          <p class="text-xs text-amber-700">Solo se muestra una vez. Copiala y guardala en el scraper.</p>
+          <div class="flex gap-2">
+            <input
+              type="text"
+              [value]="generatedApiKey"
+              readonly
+              class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
+            />
+            <button
+              type="button"
+              (click)="copyIngestKeyToClipboard()"
+              class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            >
+              Copiar
+            </button>
+            <button
+              type="button"
+              (click)="clearGeneratedKey()"
+              class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            >
+              Ocultar
+            </button>
+          </div>
+        </ng-container>
+        <p *ngIf="ingestKeyError" class="text-sm text-red-600">{{ ingestKeyError }}</p>
+      </div>
+    </section>
   </div>
 
   <section class="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">

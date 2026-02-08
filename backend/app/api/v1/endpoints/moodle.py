@@ -3,9 +3,11 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+from app.crud.ingest_api_key import create_ingest_api_key, get_user_by_api_key
 
 from app.crud import moodle as crud_moodle
 from app.db.session import get_db
@@ -13,10 +15,12 @@ from app.db.session import SessionLocal
 from app.modules.moodle.adapters import get_adapter
 from app.modules.moodle.complete import complete_survey as complete_moodle_survey
 from app.modules.moodle import pipeline as moodle_pipeline
+from app.crud.user import get_user
 from app.schemas.moodle_course import MoodleCourseRead
 from app.schemas.moodle_module import MoodleModuleRead
 from app.schemas.moodle_module_survey import MoodleModuleSurveyRead
 from app.schemas.moodle_grade_item import MoodleGradeItemRead
+from app.schemas.moodle_ingest import MoodleIngestBody
 from app.services.pipeline_stream import PipelineEvent, PipelineStreamManager
 from app.services.auth import verify_jwt_token
 from app.api.v1.deps import get_current_user
@@ -147,6 +151,67 @@ def list_grade_items(
         course_id=course_id,
         item_type=item_type,
     )
+
+
+@router.post("/ingest-key", status_code=status.HTTP_200_OK)
+def create_moodle_ingest_key(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Genera una API key para usar en el endpoint de ingest (scraper, servidor local).
+    Requiere JWT. La clave se devuelve una sola vez; guardarla en el scraper (env o .env).
+    Si el usuario ya tenía una key, se reemplaza.
+    """
+    api_key = create_ingest_api_key(db, current_user.id)
+    return {"api_key": api_key, "message": "Store this key securely; it will not be shown again."}
+
+
+def get_ingest_user(
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    db: Session = Depends(get_db),
+):
+    """Dependencia: autenticación por API key para el endpoint de ingest."""
+    if not x_api_key or not x_api_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-API-Key header",
+        )
+    user = get_user_by_api_key(db, x_api_key)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+    return user
+
+
+@router.post("/ingest", status_code=status.HTTP_200_OK)
+def moodle_ingest(
+    body: MoodleIngestBody,
+    db: Session = Depends(get_db),
+    ingest_user=Depends(get_ingest_user),
+):
+    """
+    Ingest de datos Moodle desde un scraper u otra fuente.
+    Requiere header X-API-Key (generada en POST /moodle/ingest-key con JWT).
+    Solo se puede ingestar para el usuario dueño de la API key (body.user_id == ingest_user.id).
+    """
+    if body.user_id != ingest_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot ingest for another user",
+        )
+    try:
+        moodle_pipeline.apply_ingest_payload(
+            db, body.user_id, body.snapshot, body.diffs
+        )
+    except (KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid snapshot or diffs structure",
+        ) from exc
+    return {"status": "ok"}
 
 
 @router.post("/surveys/complete/{survey_id}")
