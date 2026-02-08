@@ -11,24 +11,39 @@ It includes a Python/FastAPI backend and a frontend client.
 
 ## Quick start (Docker)
 
-1. Copia la plantilla de entorno en la **raíz del proyecto** y relléna la que necesites. Docker Compose carga ese `.env` solo por estar en la misma carpeta que `docker-compose.yml` (no hace falta `env_file`):
+El proyecto usa **dos composes** para permitir despliegue por separado:
+
+- **`docker-compose.yml`**: solo **db** y **backend** (API + PostgreSQL).
+- **`docker-compose.frontend.yml`**: solo **frontend** (app web). Opcional; puedes correr el frontend en local con `npm run start:local`.
+
+1. Copia la plantilla de entorno en la **raíz del proyecto** (Docker Compose carga el `.env` por estar en la misma carpeta):
 
 ```bash
 cp .env.example .env
 ```
 
-   Si no creas `.env`, el compose usa valores por defecto válidos para desarrollo (Postgres en `db:5432`, etc.).
-
-2. Levanta el stack:
+2. Levanta backend + DB:
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-3. Open the apps:
+3. (Opcional) Levanta el frontend en Docker (puerto 52052) o en local:
 
-- Frontend: http://localhost:4200
+```bash
+# Con backend en el mismo host (por defecto backend:8000 no resuelve; en otro servidor usa BACKEND_UPSTREAM):
+# En Windows/Mac con backend en la máquina host:
+docker compose -f docker-compose.frontend.yml up --build -d
+# y configura BACKEND_UPSTREAM=host.docker.internal:8000 en el .env o al ejecutar
+
+# O frontend en local (proxy a localhost:8000):
+cd assistant-frontend && npm install && npm run start:local
+```
+
+4. Abre las apps:
+
 - Backend: http://localhost:8000
+- Frontend (Docker): http://localhost:52052 — o Frontend (local): http://localhost:4200
 
 ## Environment variables
 
@@ -52,27 +67,15 @@ Backend reads these variables (see `backend/.env.example`):
 
 ## Deploy on Dokploy (Docker Compose)
 
-This project is designed to run with `docker-compose.yml` and a Postgres
-container managed by Dokploy. The compose file does **not** require a `.env`
-file; all values come from environment variables (with defaults where applicable).
+Puedes desplegar en dos apps separadas (recomendado para backend y frontend por separado) o en una sola si usas ambos composes.
 
-1. Create a new Docker Compose app in Dokploy and point it to this repo.
-2. In the **Domains** tab, add your domain and assign it to the **`frontend`** service with port **`80`**.
-   - **Protocol**: set to **HTTPS** (not HTTP).
-   - **Certificate**: select **Let's Encrypt** so Traefik creates a router on the
-     `websecure` entrypoint. With HTTP + "Cert: none" Traefik only creates a `web`
-     (port 80) router; if the server has a global HTTP→HTTPS redirect (default in
-     Dokploy), every request is redirected to HTTPS where no router exists → **404**.
-   - Do **not** add custom Traefik labels in `docker-compose.yml` — Dokploy
-     generates its own router and having two for the same host causes conflicts.
-   - All traffic (`/`, `/login`, `/api/…`) must reach the frontend container;
-     Nginx inside it serves the Angular SPA and proxies `/api/` to the backend.
-   - If you assign the domain to the **backend** service instead, you will see
-     `404` on `/login`, `/favicon.ico`, and every other SPA route.
-3. In the app's **Environment variables** (or "Env" section), set the variables
-   listed below so they are available when `docker compose` runs. Do not rely
-   on a `backend/.env` or `.env` file in the repo.
-4. Deploy the stack.
+- **App 1 – Backend + DB**: usa `docker-compose.yml`. En **Environment variables** configura las variables listadas abajo. No asignes dominio al backend si todo el tráfico web debe pasar por el frontend.
+- **App 2 – Frontend**: usa `docker-compose.frontend.yml`. Configura `BACKEND_UPSTREAM` con el host:puerto del backend (p. ej. el nombre del servicio backend en la otra app o la URL pública del API). En la pestaña **Domains** asigna tu dominio al servicio **`frontend`**, puerto **`80`**:
+  - **Protocol**: **HTTPS**.
+  - **Certificate**: **Let's Encrypt**.
+  - Todo el tráfico (`/`, `/login`, `/api/…`) debe llegar al contenedor frontend; Nginx sirve la SPA y hace proxy de `/api/` al backend (usando `BACKEND_UPSTREAM`).
+  - No añadas labels Traefik manuales; Dokploy genera el router.
+5. Despliega ambas apps (o una sola que use ambos archivos si tu flujo lo permite).
 
 Recommended environment variables for Dokploy:
 
@@ -115,17 +118,8 @@ Notes:
   or not on the same Docker network—often because required env vars were missing
   at deploy time. Ensure all variables are set in Dokploy and that the backend
   service starts successfully.
-- **404 en `/login`, `/favicon.ico` o rutas de la SPA:**
-  (1) En **Domains** el destino debe ser **`frontend`**, puerto **`80`**,
-  protocolo **HTTPS** y certificado **Let's Encrypt**.
-  Con HTTP + "Cert: none", Traefik solo crea un router en `web` (port 80);
-  si hay redirect global HTTP→HTTPS (default en Dokploy), todas las
-  peticiones terminan en `websecure` sin router → 404.
-  (2) No añadas labels Traefik manuales en `docker-compose.yml`.
-  (3) Si tras desplegar sigues viendo 404, quita los dominios, despliega,
-  y vuelve a añadirlos para que Dokploy regenere los routers.
-  (4) La rama que despliega (p. ej. `main`) debe tener este `docker-compose.yml`.
-- If you expose the backend directly, expect `404` on `/` (use `/health`).
+- **404 en `/login`, `/favicon.ico` o rutas de la SPA:** En **Domains** el destino debe ser **`frontend`**, puerto **`80`**, HTTPS y Let's Encrypt. No añadas labels Traefik manuales. Si persiste, quita dominios, despliega y vuelve a añadirlos.
+- Si expones solo el backend, en `/` verás 404 (usa `/health` para comprobar).
 
 ## Development
 

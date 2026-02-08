@@ -1,0 +1,24 @@
+# Compose solo para el frontend (despliegue independiente).
+# El backend y la DB se despliegan con docker-compose.yml (db + backend).
+#
+# Uso:
+#   Desarrollo local con backend en otro host:
+#     BACKEND_UPSTREAM=host.docker.internal:8000 docker compose -f docker-compose.frontend.yml up -d
+#   Producción (backend en otro servidor/dominio, mismo host:puerto que expone la API):
+#     BACKEND_UPSTREAM=api.tudominio.com:8000 docker compose -f docker-compose.frontend.yml up -d
+#   Si el frontend está detrás de un proxy que ya reenvía /api al backend, no hace falta BACKEND_UPSTREAM en la imagen.
+
+services:
+  frontend:
+    build:
+      context: ./assistant-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "52052:80"
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5

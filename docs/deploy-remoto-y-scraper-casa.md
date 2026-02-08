@@ -6,14 +6,14 @@ Este documento describe cómo desplegar el stack en un servidor remoto y cómo u
 
 ## 1. Arquitectura de red
 
-- **Servidor remoto**: aloja backend, frontend y base de datos. Debe tener una **URL pública** (dominio o IP) para que el API sea accesible desde internet.
+- **Servidor remoto**: puede alojar backend + base de datos en un compose y el frontend en otro (despliegue separado), o todo en el mismo host. Debe tener una **URL pública** (dominio o IP) para que el API sea accesible desde internet.
 - **Equipo en casa**: ejecuta el scraper (Docker o script). **No necesita IP pública** ni puertos abiertos; solo debe poder hacer **conexiones salientes** (HTTPS) al servidor remoto.
 
 ```
 ┌─────────────────────────┐         HTTPS (saliente)          ┌──────────────────────────────┐
 │  Casa (scraper)          │  ──────────────────────────────►  │  Servidor remoto             │
 │  - Sin IP pública        │   POST /api/v1/moodle/ingest       │  - Backend (API)              │
-│  - Cron / manual         │   Header: X-API-Key                │  - Frontend                  │
+│  - Cron / manual         │   Header: X-API-Key                │  - Frontend (imagen aparte)   │
 │  - Credenciales locales  │                                   │  - PostgreSQL                │
 └─────────────────────────┘                                   └──────────────────────────────┘
 ```
@@ -22,15 +22,25 @@ Este documento describe cómo desplegar el stack en un servidor remoto y cómo u
 
 ## 2. Despliegue del stack remoto
 
-### 2.1 Servicios del stack
+El stack está dividido en dos composes para permitir despliegue independiente:
 
-El proyecto incluye un `docker-compose.yml` con:
+- **`docker-compose.yml`**: solo **db** y **backend**. Úsalo en el servidor donde quieras la API y la base de datos.
+- **`docker-compose.frontend.yml`**: solo **frontend**. Úsalo donde quieras servir la aplicación web (mismo servidor u otro). El frontend hace proxy de `/api` al backend; indica la URL del backend con la variable `BACKEND_UPSTREAM` (p. ej. `api.tudominio.com:8000` o `host.docker.internal:8000` en local).
+
+### 2.1 Servicios por compose
+
+**docker-compose.yml (backend + DB):**
 
 | Servicio   | Función                    | Puerto (interno) | Notas |
 |-----------|----------------------------|------------------|--------|
 | `db`      | PostgreSQL                 | 5432             | No exponer a internet. |
 | `backend` | API FastAPI (incl. ingest)| 8000             | Debe ser alcanzable por HTTPS desde el scraper. |
-| `frontend`| Aplicación web             | 80               | Opcional para uso del scraper; sí para usuarios. |
+
+**docker-compose.frontend.yml (frontend solo):**
+
+| Servicio   | Función                    | Puerto (interno) | Notas |
+|-----------|----------------------------|------------------|--------|
+| `frontend`| Aplicación web (Nginx)     | 80               | Variable `BACKEND_UPSTREAM` para la URL del backend. |
 
 ### 2.2 Variables de entorno en el remoto
 
@@ -133,4 +143,4 @@ Para más detalle (volumen de datos, cron, ejecución local), ver [scraper/READM
 
 - Contrato del payload y del endpoint: [moodle-ingest-spec.md](./moodle-ingest-spec.md).
 - Build, variables y cron del scraper: [scraper/README.md](../scraper/README.md).
-- Stack remoto: [docker-compose.yml](../docker-compose.yml) en la raíz del repo.
+- Stack remoto: [docker-compose.yml](../docker-compose.yml) (db + backend) y [docker-compose.frontend.yml](../docker-compose.frontend.yml) (frontend solo) en la raíz del repo.
