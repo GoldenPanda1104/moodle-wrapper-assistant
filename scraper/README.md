@@ -60,8 +60,43 @@ Las variables de entorno deben estar definidas (export o `.env` cargado). El scr
 
 ## Cron / programación
 
-En un servidor local se puede programar con cron, por ejemplo cada 6 horas:
+En un servidor local se puede programar con cron. Ejemplos:
+
+- **Cada hora** (minuto 0 de cada hora):
+
+```cron
+0 * * * * docker run --rm --init --ipc=host -v /path/to/scraper-data:/app/app/modules/moodle/data --env-file /path/to/.env moodle-scraper
+```
+
+- **Cada 6 horas**:
 
 ```cron
 0 */6 * * * docker run --rm --init --ipc=host -v /path/to/scraper-data:/app/app/modules/moodle/data --env-file /path/to/.env moodle-scraper
 ```
+
+Ajusta `/path/to/scraper-data` y `/path/to/.env` a tus rutas reales.
+
+### Cómo obtener las rutas completas (Ubuntu)
+
+Desde la raíz del repo y con la carpeta de datos creada (`mkdir -p ~/scraper-data`):
+
+```bash
+echo "Ruta .env:   $(realpath scraper/.env)"
+echo "Ruta datos:  $(realpath ~/scraper-data)"
+echo "Ruta docker: $(which docker)"
+```
+
+Usa esas rutas en la línea del cron.
+
+### Registrar el cron en Ubuntu
+
+1. Abre el crontab de tu usuario:
+   ```bash
+   crontab -e
+   ```
+2. Añade la línea (cada hora) al final del archivo, con tus rutas reales. Si `docker` no está en el PATH de cron, usa la ruta completa (`which docker`):
+   ```cron
+   0 * * * * /usr/bin/docker run --rm --init --ipc=host -v /home/TU_USUARIO/scraper-data:/app/app/modules/moodle/data --env-file /home/TU_USUARIO/suantechs-study/scraper/.env moodle-scraper
+   ```
+3. Guarda y cierra (en nano: `Ctrl+O`, Enter, `Ctrl+X`).
+4. Verifica: `crontab -l`.

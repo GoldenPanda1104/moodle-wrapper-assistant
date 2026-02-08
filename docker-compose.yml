@@ -43,22 +43,6 @@ services:
       timeout: 5s
       retries: 5
 
-  frontend:
-    build:
-      context: ./assistant-frontend
-      dockerfile: Dockerfile
-    ports:
-      - "52052:80"
-    networks:
-      - app-network
-    depends_on:
-      - backend
-    healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
 volumes:
   postgres_data:
 
