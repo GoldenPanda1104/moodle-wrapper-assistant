@@ -11,39 +11,28 @@ It includes a Python/FastAPI backend and a frontend client.
 
 ## Quick start (Docker)
 
-El proyecto usa **dos composes** para permitir despliegue por separado:
+**`docker-compose.yml`** levanta el stack completo (db + backend + frontend). Un solo dominio puede apuntar al servicio **frontend** (puerto 80); el frontend hace proxy de `/api` al backend.
 
-- **`docker-compose.yml`**: solo **db** y **backend** (API + PostgreSQL).
-- **`docker-compose.frontend.yml`**: solo **frontend** (app web). Opcional; puedes correr el frontend en local con `npm run start:local`.
+Opcional: **`docker-compose.frontend.yml`** sirve para desplegar solo el frontend en otro host.
 
-1. Copia la plantilla de entorno en la **raíz del proyecto** (Docker Compose carga el `.env` por estar en la misma carpeta):
+1. Copia la plantilla de entorno en la **raíz del proyecto**:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Levanta backend + DB:
+2. Levanta el stack:
 
 ```bash
 docker compose up --build -d
 ```
 
-3. (Opcional) Levanta el frontend en Docker (puerto 52052) o en local:
+3. Abre las apps:
 
-```bash
-# Con backend en el mismo host (por defecto backend:8000 no resuelve; en otro servidor usa BACKEND_UPSTREAM):
-# En Windows/Mac con backend en la máquina host:
-docker compose -f docker-compose.frontend.yml up --build -d
-# y configura BACKEND_UPSTREAM=host.docker.internal:8000 en el .env o al ejecutar
+- Frontend: http://localhost:52052
+- Backend (API): http://localhost:8000
 
-# O frontend en local (proxy a localhost:8000):
-cd assistant-frontend && npm install && npm run start:local
-```
-
-4. Abre las apps:
-
-- Backend: http://localhost:8000
-- Frontend (Docker): http://localhost:52052 — o Frontend (local): http://localhost:4200
+Para desarrollo con frontend en local (proxy a backend): `cd assistant-frontend && npm run start:local` → http://localhost:4200
 
 ## Environment variables
 
@@ -67,15 +56,13 @@ Backend reads these variables (see `backend/.env.example`):
 
 ## Deploy on Dokploy (Docker Compose)
 
-Puedes desplegar en dos apps separadas (recomendado para backend y frontend por separado) o en una sola si usas ambos composes.
-
-- **App 1 – Backend + DB**: usa `docker-compose.yml`. En **Environment variables** configura las variables listadas abajo. No asignes dominio al backend si todo el tráfico web debe pasar por el frontend.
-- **App 2 – Frontend**: usa `docker-compose.frontend.yml`. Configura `BACKEND_UPSTREAM` con el host:puerto del backend (p. ej. el nombre del servicio backend en la otra app o la URL pública del API). En la pestaña **Domains** asigna tu dominio al servicio **`frontend`**, puerto **`80`**:
-  - **Protocol**: **HTTPS**.
-  - **Certificate**: **Let's Encrypt**.
-  - Todo el tráfico (`/`, `/login`, `/api/…`) debe llegar al contenedor frontend; Nginx sirve la SPA y hace proxy de `/api/` al backend (usando `BACKEND_UPSTREAM`).
-  - No añadas labels Traefik manuales; Dokploy genera el router.
-5. Despliega ambas apps (o una sola que use ambos archivos si tu flujo lo permite).
+1. Crea una app Docker Compose en Dokploy y apunta al repo. **Compose Path**: `./docker-compose.yml` (stack completo: db + backend + frontend).
+2. En **Environment variables** configura las variables listadas abajo.
+3. En **Domains** añade tu dominio (p. ej. `study.suantechs.com`) asignado al servicio **`frontend`**, puerto **`80`**:
+   - **Protocol**: **HTTPS**.
+   - **Certificate**: **Let's Encrypt** (no "Cert: none").
+   - Todo el tráfico (`/`, `/login`, `/api/…`) llega al frontend; Nginx sirve la SPA y hace proxy de `/api/` al backend.
+4. Despliega.
 
 Recommended environment variables for Dokploy:
 
