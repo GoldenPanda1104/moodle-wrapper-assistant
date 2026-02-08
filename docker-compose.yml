@@ -1,3 +1,6 @@
+# Stack completo: db + backend + frontend. Un solo dominio apuntando al servicio frontend (puerto 80).
+# Para desplegar solo el frontend en otro host, usa docker-compose.frontend.yml.
+
 services:
   db:
     image: postgres:16
@@ -39,6 +42,24 @@ services:
     command: [ "sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000" ]
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health').read()" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./assistant-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "52052:80"
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
+    networks:
+      - app-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 5
