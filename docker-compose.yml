@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: assistant
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
@@ -30,6 +32,8 @@ services:
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
+    networks:
+      - app-network
     depends_on:
       - db
     command: [ "sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000" ]
@@ -45,6 +49,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "52052:80"
+    networks:
+      - app-network
     depends_on:
       - backend
     healthcheck:
@@ -55,3 +61,7 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
