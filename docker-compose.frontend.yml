@@ -14,7 +14,7 @@ services:
       context: ./assistant-frontend
       dockerfile: Dockerfile
     ports:
-      - "52052:80"
+      - "80:80"
     environment:
       BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
     healthcheck:
