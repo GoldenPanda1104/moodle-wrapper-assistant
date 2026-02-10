@@ -7,7 +7,7 @@ Esta guía detalla el proceso completo para desplegar Moodle Wrapper Assistant e
 1. **Servidor con Dokploy instalado**
 2. **Dominios configurados** apuntando a tu servidor:
    - Frontend: `study.suantechs.com` (o tu dominio)
-   - Backend: `study-api.suantechs.com` (o tu dominio)
+   - Backend: `api-study.suantechs.com` (o tu dominio)
 3. **Puertos abiertos**: 80 (HTTP) y 443 (HTTPS)
 4. **Traefik configurado** en Dokploy (viene por defecto)
 
@@ -46,7 +46,7 @@ MOODLE_PASSWORD=tu-password
 
 # Traefik/Dokploy (IMPORTANTE - Ajustar tus dominios)
 FRONTEND_DOMAIN=study.suantechs.com
-BACKEND_DOMAIN=study-api.suantechs.com
+BACKEND_DOMAIN=api-study.suantechs.com
 TRAEFIK_CERTRESOLVER=letsencrypt
 TRAEFIK_ENABLE_FRONTEND=true
 TRAEFIK_ENABLE_BACKEND=true
@@ -114,7 +114,7 @@ Si prefieres configurar dominios manualmente:
    - **HTTPS**: Activado
    - **Certificate**: Let's Encrypt
 4. Añade el dominio del backend (si lo necesitas expuesto):
-   - **Domain**: `study-api.suantechs.com`
+   - **Domain**: `api-study.suantechs.com`
    - **Container Port**: `8000`
    - **Service**: `backend`
    - **HTTPS**: Activado
@@ -159,7 +159,7 @@ Deberías ver 3 contenedores:
 
 ```bash
 # Backend
-curl https://study-api.suantechs.com/health
+curl https://api-study.suantechs.com/health
 
 # Frontend
 curl https://study.suantechs.com/
