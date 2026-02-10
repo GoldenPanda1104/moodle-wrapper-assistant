@@ -1,9 +1,12 @@
 # Stack completo: db + backend + frontend.
 # Para desplegar solo el frontend en otro host, usa docker-compose.frontend.yml.
 #
-# Dokploy: los servicios deben estar en la red "dokploy-network" para que Traefik los alcance.
-# Las etiquetas Traefik definen los dominios y HTTPS. Si usas la pestaña Domains de Dokploy,
-# QUITA los dominios de la UI para no duplicar routers (o comenta el bloque labels de cada servicio).
+# Dokploy deployment:
+# 1. Los servicios deben estar en la red "dokploy-network" para que Traefik los alcance.
+# 2. Las etiquetas Traefik configuran dominios y HTTPS automáticamente mediante variables de entorno.
+# 3. Configura FRONTEND_DOMAIN, BACKEND_DOMAIN y TRAEFIK_CERTRESOLVER en las variables de entorno.
+# 4. NO añadas dominios en la UI de Dokploy si usas las etiquetas Traefik (evita duplicados).
+# 5. Para deshabilitar Traefik labels, usa TRAEFIK_ENABLE_FRONTEND=false y TRAEFIK_ENABLE_BACKEND=false
 
 services:
   db:
@@ -37,8 +40,6 @@ services:
       MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME:-Moodle Wrapper}
       MAILERSEND_TO_EMAIL: ${MAILERSEND_TO_EMAIL:-}
       PYTHONUNBUFFERED: "1"
-    ports:
-      - "8000:8000"
     networks:
       - app-network
       - dokploy-network
@@ -51,18 +52,24 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.study-backend.rule=Host(`study-api.suantechs.com`)"
-      - "traefik.http.routers.study-backend.entrypoints=websecure"
-      - "traefik.http.routers.study-backend.tls.certResolver=letsencrypt"
-      - "traefik.http.services.study-backend.loadbalancer.server.port=8000"
+      # Traefik configuration for backend
+      - "traefik.enable=${TRAEFIK_ENABLE_BACKEND:-true}"
+      - "traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-study-api.suantechs.com}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.backend-http.rule=Host(`${BACKEND_DOMAIN:-study-api.suantechs.com}`)"
+      - "traefik.http.routers.backend-http.entrypoints=web"
+      - "traefik.http.routers.backend-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
   frontend:
     build:
       context: ./assistant-frontend
       dockerfile: Dockerfile
-    ports:
-      - "52052:80"
     environment:
       BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
     networks:
@@ -71,16 +78,22 @@ services:
     depends_on:
       - backend
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost/ || exit 1" ]
       interval: 15s
       timeout: 5s
       retries: 5
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.study-frontend.rule=Host(`study.suantechs.com`)"
-      - "traefik.http.routers.study-frontend.entrypoints=websecure"
-      - "traefik.http.routers.study-frontend.tls.certResolver=letsencrypt"
-      - "traefik.http.services.study-frontend.loadbalancer.server.port=80"
+      # Traefik configuration for frontend
+      - "traefik.enable=${TRAEFIK_ENABLE_FRONTEND:-true}"
+      - "traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN:-study.suantechs.com}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.frontend-http.rule=Host(`${FRONTEND_DOMAIN:-study.suantechs.com}`)"
+      - "traefik.http.routers.frontend-http.entrypoints=web"
+      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
 
 volumes:
   postgres_data:
