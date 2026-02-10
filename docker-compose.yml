@@ -54,13 +54,13 @@ services:
     labels:
       # Traefik configuration for backend
       - "traefik.enable=${TRAEFIK_ENABLE_BACKEND:-true}"
-      - "traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-study-api.suantechs.com}`)"
+      - "traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-api-study.suantechs.com}`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
       # HTTP to HTTPS redirect
-      - "traefik.http.routers.backend-http.rule=Host(`${BACKEND_DOMAIN:-study-api.suantechs.com}`)"
+      - "traefik.http.routers.backend-http.rule=Host(`${BACKEND_DOMAIN:-api-study.suantechs.com}`)"
       - "traefik.http.routers.backend-http.entrypoints=web"
       - "traefik.http.routers.backend-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
@@ -97,6 +97,7 @@ services:
 
 volumes:
   postgres_data:
+
 
 networks:
   app-network:
