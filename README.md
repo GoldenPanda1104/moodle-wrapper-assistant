@@ -56,15 +56,11 @@ Backend reads these variables (see `backend/.env.example`):
 
 ## Deploy on Dokploy (Docker Compose)
 
-1. Crea una app Docker Compose en Dokploy y apunta al repo. **Compose Path**: `./docker-compose.yml` (stack completo: db + backend + frontend).
-2. En **Environment variables** configura las variables listadas abajo.
-3. En **Domains** añade tu dominio (p. ej. `study.suantechs.com`) asignado al servicio **`frontend`**, puerto **`80`**:
-   - **Protocol**: **HTTPS**.
-   - **Certificate**: **Let's Encrypt** (no "Cert: none").
-   - Todo el tráfico (`/`, `/login`, `/api/…`) llega al frontend; Nginx sirve la SPA y hace proxy de `/api/` al backend.
-4. Despliega.
+### Configuración Paso a Paso
 
-Recommended environment variables for Dokploy:
+1. **Crea una app Docker Compose en Dokploy** y apunta al repo. **Compose Path**: `./docker-compose.yml` (stack completo: db + backend + frontend).
+
+2. **Configura las variables de entorno** en la pestaña Environment:
 
 ```
 PROJECT_NAME=Moodle Wrapper
@@ -82,7 +78,37 @@ MAILERSEND_API_KEY=
 MAILERSEND_FROM_EMAIL=
 MAILERSEND_FROM_NAME=Moodle Wrapper
 MAILERSEND_TO_EMAIL=
+
+# Traefik/Dokploy configuration (IMPORTANTE)
+FRONTEND_DOMAIN=study.suantechs.com
+BACKEND_DOMAIN=study-api.suantechs.com
+TRAEFIK_CERTRESOLVER=letsencrypt
+TRAEFIK_ENABLE_FRONTEND=true
+TRAEFIK_ENABLE_BACKEND=true
+BACKEND_UPSTREAM=backend:8000
 ```
+
+3. **IMPORTANTE - Configuración de Dominios:**
+
+   **Opción A: Usar Traefik Labels (Recomendado)**
+   - NO añadas dominios en la pestaña "Domains" de Dokploy
+   - Los dominios se configuran automáticamente mediante las variables de entorno `FRONTEND_DOMAIN` y `BACKEND_DOMAIN`
+   - Asegúrate de que `TRAEFIK_CERTRESOLVER` coincida con el nombre del cert resolver de tu Traefik (por defecto: `letsencrypt`)
+   - Los certificados SSL se obtienen automáticamente vía Let's Encrypt
+
+   **Opción B: Usar la UI de Dokploy**
+   - Si prefieres usar la pestaña "Domains" de Dokploy, configura:
+     - `TRAEFIK_ENABLE_FRONTEND=false`
+     - `TRAEFIK_ENABLE_BACKEND=false`
+   - Luego añade manualmente tus dominios en la UI
+
+4. **Despliega** y verifica que ambos servicios estén corriendo
+
+### Verificación de Certificados SSL
+
+Para verificar el cert resolver correcto de Traefik:
+- Verifica el nombre en la configuración de Traefik de Dokploy (usualmente `letsencrypt`)
+- Si el cert resolver tiene otro nombre, actualiza `TRAEFIK_CERTRESOLVER` en las variables de entorno
 
 Generate `SERVER_MASTER_KEY` (32 bytes, base64):
 
@@ -98,15 +124,31 @@ Health checks:
 - Backend: `GET /health`
 - Frontend: `GET /`
 
-Notes:
+### Troubleshooting
 
-- The frontend proxies `/api/` to the backend service inside Docker. If you see
-  `502` or “backend could not be resolved”, the backend container is not running
-  or not on the same Docker network—often because required env vars were missing
-  at deploy time. Ensure all variables are set in Dokploy and that the backend
-  service starts successfully.
-- **404 en `/login`, `/favicon.ico` o rutas de la SPA:** En **Domains** el destino debe ser **`frontend`**, puerto **`80`**, HTTPS y Let's Encrypt. No añadas labels Traefik manuales. Si persiste, quita dominios, despliega y vuelve a añadirlos.
-- Si expones solo el backend, en `/` verás 404 (usa `/health` para comprobar).
+**Error 404 en Frontend y Backend:**
+- Verifica que `TRAEFIK_ENABLE_FRONTEND=true` y `TRAEFIK_ENABLE_BACKEND=true` estén configurados
+- Asegúrate de que los dominios (`FRONTEND_DOMAIN`, `BACKEND_DOMAIN`) estén correctamente configurados
+- Verifica que no haya dominios duplicados en la UI de Dokploy si estás usando Traefik labels
+
+**Error: No se obtiene certificado SSL:**
+- Verifica que `TRAEFIK_CERTRESOLVER` coincida con el nombre exacto del cert resolver en Traefik
+- Común en Dokploy: `letsencrypt` (minúsculas)
+- Los dominios deben apuntar correctamente a tu servidor (DNS configurado)
+- Verifica que los puertos 80 y 443 estén abiertos en tu firewall
+
+**Error 502 - Bad Gateway:**
+- El backend no está corriendo o no está en la red `dokploy-network`
+- Verifica que todas las variables de entorno estén configuradas (especialmente `DATABASE_URL`, `JWT_SECRET`, `SERVER_MASTER_KEY`)
+- Revisa los logs del contenedor backend: `docker logs <container_name>`
+
+**Error: Backend could not be resolved:**
+- Verifica que `BACKEND_UPSTREAM=backend:8000` esté configurado
+- Asegúrate de que ambos servicios estén en las redes `app-network` y `dokploy-network`
+
+**Conflicto de routers Traefik:**
+- Si tienes dominios configurados en la UI de Dokploy Y las variables de entorno, deshabilita uno de los dos
+- Recomendado: usa solo las variables de entorno y deja la pestaña Domains vacía
 
 ## Development
 
