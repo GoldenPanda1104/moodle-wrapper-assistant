@@ -1,5 +1,9 @@
-# Stack completo: db + backend + frontend. Un solo dominio apuntando al servicio frontend (puerto 80).
+# Stack completo: db + backend + frontend.
 # Para desplegar solo el frontend en otro host, usa docker-compose.frontend.yml.
+#
+# Dokploy: los servicios deben estar en la red "dokploy-network" para que Traefik los alcance.
+# Las etiquetas Traefik definen los dominios y HTTPS. Si usas la pestaña Domains de Dokploy,
+# QUITA los dominios de la UI para no duplicar routers (o comenta el bloque labels de cada servicio).
 
 services:
   db:
@@ -37,6 +41,7 @@ services:
       - "8000:8000"
     networks:
       - app-network
+      - dokploy-network
     depends_on:
       - db
     command: [ "sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000" ]
@@ -45,6 +50,12 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.study-backend.rule=Host(`study-api.suantechs.com`)"
+      - "traefik.http.routers.study-backend.entrypoints=websecure"
+      - "traefik.http.routers.study-backend.tls.certResolver=letsencrypt"
+      - "traefik.http.services.study-backend.loadbalancer.server.port=8000"
 
   frontend:
     build:
@@ -56,6 +67,7 @@ services:
       BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
     networks:
       - app-network
+      - dokploy-network
     depends_on:
       - backend
     healthcheck:
@@ -63,6 +75,12 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.study-frontend.rule=Host(`study.suantechs.com`)"
+      - "traefik.http.routers.study-frontend.entrypoints=websecure"
+      - "traefik.http.routers.study-frontend.tls.certResolver=letsencrypt"
+      - "traefik.http.services.study-frontend.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:
@@ -70,3 +88,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  dokploy-network:
+    external: true
