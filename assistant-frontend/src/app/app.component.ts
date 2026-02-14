@@ -1,5 +1,5 @@
 import { Component, DestroyRef, Inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
 import { NotificationService } from './core/services/notification.service';
@@ -16,10 +16,21 @@ import { of, switchMap, timer } from 'rxjs';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
+const PUSH_BANNER_DISMISSED_KEY = 'suantechs-study-push-banner-dismissed';
+const PUSH_AUTO_PROMPTED_KEY = 'suantechs-study-push-auto-prompted';
+
 export class AppComponent {
   title = 'assistant-frontend';
   unreadCount = 0;
   private notificationsInitialized = false;
+  /** Hay OneSignal configurado y ya inicializado. */
+  hasPushAvailable = false;
+  /** El usuario cerró el aviso de activar push sin aceptar. */
+  pushBannerDismissed = false;
+  /** Permiso de notificaciones ya concedido. */
+  pushPermissionGranted = false;
+  /** Menú móvil abierto. */
+  mobileMenuOpen = false;
 
   constructor(
     private readonly auth: AuthService,
@@ -28,8 +39,10 @@ export class AppComponent {
     private readonly oneSignal: OneSignalService,
     public readonly pwaInstall: PwaInstallService,
     private readonly destroyRef: DestroyRef,
+    private readonly router: Router,
   ) {
     this.watchAuthentication();
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.closeMobileMenu());
   }
 
   async installPwa(): Promise<void> {
@@ -38,6 +51,29 @@ export class AppComponent {
 
   dismissPwaBanner(): void {
     this.pwaInstall.setDismissed(true);
+  }
+
+  dismissPushBanner(): void {
+    this.pushBannerDismissed = true;
+    try {
+      localStorage.setItem(PUSH_BANNER_DISMISSED_KEY, '1');
+    } catch {}
+  }
+
+  async requestPushPermission(): Promise<void> {
+    const granted = await this.oneSignal.requestPermission();
+    if (granted) {
+      this.pushPermissionGranted = true;
+      this.pushBannerDismissed = true;
+    }
+  }
+
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen = !this.mobileMenuOpen;
+  }
+
+  closeMobileMenu(): void {
+    this.mobileMenuOpen = false;
   }
 
   isAuthenticated(): boolean {
@@ -60,17 +96,30 @@ export class AppComponent {
     }
     this.notificationsInitialized = true;
 
+    try {
+      this.pushBannerDismissed = localStorage.getItem(PUSH_BANNER_DISMISSED_KEY) === '1';
+    } catch {}
+
     this.notifications
       .getConfig()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((config) => {
         if (config.onesignal_app_id) {
           this.oneSignal.init(config.onesignal_app_id, config.onesignal_web_origin);
+          this.hasPushAvailable = true;
           this.users
             .getProfile()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((profile) => {
               this.oneSignal.login(String(profile.id));
+              // Solicitar permiso de push una vez por sesión tras un breve delay.
+              try {
+                const alreadyPrompted = sessionStorage.getItem(PUSH_AUTO_PROMPTED_KEY) === '1';
+                if (!alreadyPrompted) {
+                  sessionStorage.setItem(PUSH_AUTO_PROMPTED_KEY, '1');
+                  setTimeout(() => this.requestPushPermission(), 1500);
+                }
+              } catch {}
             });
         }
       });

@@ -34,7 +34,9 @@ export class OneSignalService {
     if (!OneSignal || !this.initialized) {
       return;
     }
-    OneSignal.login(externalUserId);
+    OneSignal.push(() => {
+      OneSignal.login(externalUserId);
+    });
   }
 
   logout(): void {
@@ -42,6 +44,53 @@ export class OneSignalService {
     if (!OneSignal || !this.initialized) {
       return;
     }
-    OneSignal.logout();
+    OneSignal.push(() => {
+      OneSignal.logout();
+    });
+  }
+
+  /** Devuelve true si el navegador soporta push. */
+  isPushSupported(): boolean {
+    const OneSignal = window.OneSignal;
+    if (!OneSignal || !this.initialized) return false;
+    try {
+      return typeof OneSignal?.Notifications?.isPushSupported === 'function' && OneSignal.Notifications.isPushSupported();
+    } catch {
+      return false;
+    }
+  }
+
+  /** Estado nativo del permiso: 'default' | 'granted' | 'denied'. */
+  getPermissionNative(): 'default' | 'granted' | 'denied' {
+    const OneSignal = window.OneSignal;
+    if (!OneSignal?.Notifications) return 'denied';
+    try {
+      const p = OneSignal.Notifications.permissionNative;
+      return p === 'granted' || p === 'denied' ? p : 'default';
+    } catch {
+      return 'denied';
+    }
+  }
+
+  /** Solicita el permiso de notificaciones push (muestra el diálogo del navegador). */
+  requestPermission(): Promise<boolean> {
+    const OneSignal = window.OneSignal;
+    if (!OneSignal || !this.initialized) {
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      OneSignal.push(async () => {
+        try {
+          if (OneSignal.Notifications?.requestPermission) {
+            const granted = await OneSignal.Notifications.requestPermission();
+            resolve(!!granted);
+          } else {
+            resolve(false);
+          }
+        } catch {
+          resolve(false);
+        }
+      });
+    });
   }
 }
