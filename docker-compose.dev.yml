@@ -1,0 +1,81 @@
+# Desarrollo local con hot reload (Angular + Python).
+# No incluye db: usa la misma DB que el stack principal o arranca solo db.
+#
+# Uso:
+#   Con DB y servicios de prod parados, levantar todo en modo dev:
+#     docker compose -f docker-compose.dev.yml up
+#   O solo backend + frontend (DB ya corriendo con docker compose up -d):
+#     docker compose -f docker-compose.dev.yml up backend frontend
+#
+#   Frontend (Angular): http://localhost:4200  — hot reload con --poll 2000
+#   Backend (FastAPI):  http://localhost:8000  — uvicorn --reload
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: assistant
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/assistant}
+      PROJECT_NAME: ${PROJECT_NAME:-Moodle Wrapper}
+      MOODLE_BASE_URL: ${MOODLE_BASE_URL:-}
+      SERVER_MASTER_KEY: ${SERVER_MASTER_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Panama}
+      MAILERSEND_API_KEY: ${MAILERSEND_API_KEY:-}
+      MAILERSEND_FROM_EMAIL: ${MAILERSEND_FROM_EMAIL:-}
+      MAILERSEND_FROM_NAME: ${MAILERSEND_FROM_NAME:-Moodle Wrapper}
+      MAILERSEND_TO_EMAIL: ${MAILERSEND_TO_EMAIL:-}
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_healthy
+    command: [ "sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload" ]
+
+  frontend:
+    image: assistant-frontend:dev
+    build:
+      context: ./assistant-frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./assistant-frontend:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - app-network
+    depends_on:
+      - backend
+    command: [ "sh", "-c", "npm install && npm run start -- --host 0.0.0.0 --poll 2000 --allowed-hosts=all" ]
+
+volumes:
+  postgres_data_dev:
+  frontend_node_modules:
+
+networks:
+  app-network:
+    driver: bridge

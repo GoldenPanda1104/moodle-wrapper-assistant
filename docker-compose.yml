@@ -8,6 +8,7 @@
 #
 # Para desplegar solo el frontend en otro host: docker-compose.frontend.yml
 # Para desplegar en Dokploy con Traefik: docker compose -f docker-compose.yml -f docker-compose.dokploy.yml up -d
+# Desarrollo con hot reload (Angular + Python): docker compose -f docker-compose.dev.yml up
 
 services:
   db:
