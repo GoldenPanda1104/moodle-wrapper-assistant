@@ -9,6 +9,9 @@ import { PwaInstallService } from './core/services/pwa-install.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of, switchMap, timer } from 'rxjs';
 
+const PUSH_BANNER_DISMISSED_KEY = 'suantechs-study-push-banner-dismissed';
+const PUSH_AUTO_PROMPTED_KEY = 'suantechs-study-push-auto-prompted';
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -16,9 +19,6 @@ import { of, switchMap, timer } from 'rxjs';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
-const PUSH_BANNER_DISMISSED_KEY = 'suantechs-study-push-banner-dismissed';
-const PUSH_AUTO_PROMPTED_KEY = 'suantechs-study-push-auto-prompted';
-
 export class AppComponent {
   title = 'assistant-frontend';
   unreadCount = 0;
