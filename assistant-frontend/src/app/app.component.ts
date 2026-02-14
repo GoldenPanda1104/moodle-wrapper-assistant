@@ -5,6 +5,7 @@ import { AuthService } from './core/services/auth.service';
 import { NotificationService } from './core/services/notification.service';
 import { UserService } from './core/services/user.service';
 import { OneSignalService } from './core/services/onesignal.service';
+import { PwaInstallService } from './core/services/pwa-install.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { of, switchMap, timer } from 'rxjs';
 
@@ -25,9 +26,18 @@ export class AppComponent {
     @Inject(NotificationService) private readonly notifications: NotificationService,
     private readonly users: UserService,
     private readonly oneSignal: OneSignalService,
+    public readonly pwaInstall: PwaInstallService,
     private readonly destroyRef: DestroyRef,
   ) {
     this.watchAuthentication();
+  }
+
+  async installPwa(): Promise<void> {
+    await this.pwaInstall.install();
+  }
+
+  dismissPwaBanner(): void {
+    this.pwaInstall.setDismissed(true);
   }
 
   isAuthenticated(): boolean {

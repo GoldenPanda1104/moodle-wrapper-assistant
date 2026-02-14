@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.refresh_token import RefreshToken
 from app.models.moodle_vault import MoodleVault
 from app.models.ingest_api_key import IngestApiKey
+from app.models.notification_preferences import NotificationPreferences
 
 __all__ = [
     "Task",
@@ -20,4 +21,5 @@ __all__ = [
     "RefreshToken",
     "MoodleVault",
     "IngestApiKey",
+    "NotificationPreferences",
 ]
