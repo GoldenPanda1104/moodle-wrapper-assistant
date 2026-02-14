@@ -12,7 +12,9 @@ from app.modules.moodle import pipeline as moodle_pipeline
 from app.services.mailer import send_mailersend_email
 from app.services.moodle_digest import build_pending_summary
 from app.crud.moodle_vault import list_cron_enabled_vaults
+from app.crud.notification_preferences import get_preferences as get_notification_preferences
 from app.models.user import User
+from app.services.onesignal import send_push_to_user
 
 _scheduler: AsyncIOScheduler | None = None
 
@@ -55,7 +57,13 @@ async def _run_daily_jobs() -> None:
                 await moodle_pipeline.async_run_grades_pipeline(db, user.id)
                 await moodle_pipeline.async_run_quizzes_pipeline(db, user.id)
                 subject, text = build_pending_summary(db, user.id)
-                await send_mailersend_email(subject, text, to_email=user.email)
+                prefs = get_notification_preferences(db, user.id)
+                send_email = prefs is None or prefs.email_enabled
+                send_push = prefs is not None and prefs.push_enabled and prefs.daily_digest_enabled
+                if send_email:
+                    await send_mailersend_email(subject, text, to_email=user.email)
+                if send_push:
+                    send_push_to_user(user.id, subject, (text[:200] + "...") if len(text) > 200 else text)
             except Exception as user_exc:
                 logger.exception(
                     "[Scheduler] Daily Moodle jobs failed for user %s: %s",

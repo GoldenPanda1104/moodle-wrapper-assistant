@@ -1,11 +1,16 @@
 {
-  "name": "Moodle Wrapper",
-  "short_name": "Moodle",
+  "name": "Suantechs Study",
+  "short_name": "Study",
   "description": "Dashboard para seguimiento de estudios y automatizaciones Moodle.",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
   "theme_color": "#2563eb",
   "background_color": "#eef4fb",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "assets/icons/icon-192.svg",

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     RABBITMQ_URL: str = ""
     RABBITMQ_QUEUE: str = "moodle.ingest"
 
+    # OneSignal (push notifications). Para enviar desde el backend se usa REST API key.
+    ONESIGNAL_APP_ID: str = ""
+    ONESIGNAL_REST_API_KEY: str = ""
+    ONESIGNAL_WEB_ORIGIN: str = ""
+
     class Config:
         env_file = ".env"
 
