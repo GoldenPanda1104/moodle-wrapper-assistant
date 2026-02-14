@@ -1,0 +1,32 @@
+# Override para desplegar en Dokploy con Traefik.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dokploy.yml up -d
+#
+# Requiere que la red "dokploy-network" exista (la crea Dokploy).
+# Si usas la pestaña Domains de Dokploy, quita los dominios en la UI para no duplicar routers.
+
+services:
+  backend:
+    networks:
+      - app-network
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.study-backend.rule=Host(`study-api.suantechs.com`)"
+      - "traefik.http.routers.study-backend.entrypoints=websecure"
+      - "traefik.http.routers.study-backend.tls.certResolver=letsencrypt"
+      - "traefik.http.services.study-backend.loadbalancer.server.port=8000"
+
+  frontend:
+    networks:
+      - app-network
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.study-frontend.rule=Host(`study.suantechs.com`)"
+      - "traefik.http.routers.study-frontend.entrypoints=websecure"
+      - "traefik.http.routers.study-frontend.tls.certResolver=letsencrypt"
+      - "traefik.http.services.study-frontend.loadbalancer.server.port=80"
+
+networks:
+  dokploy-network:
+    external: true
