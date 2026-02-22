@@ -1,0 +1,15 @@
+---
+description: "Convenciones backend Python/FastAPI y skills (backend/python/v3.14, databases/postgres, jwt)."
+globs: ["backend/**/*.py"]
+alwaysApply: false
+---
+
+# Backend Python / FastAPI
+
+- Cargar skills: `.ai-system/skills/backend/python/v3.14/SKILL.md`, `.ai-system/skills/databases/postgres/SKILL.md`, `.ai-system/skills/jwt/SKILL.md` (o equivalentes en `.cursor/skills/`).
+- Estructura: `app/` (main, api, core, crud, models, schemas, services, modules). Endpoints bajo `app/api/v1/endpoints/`.
+- Controladores orquestan; lógica de negocio en servicios; validación explícita (Pydantic). No poner lógica pesada en handlers.
+- Base de datos: SQLAlchemy + Alembic; migraciones versionadas. Preferir UUIDs para PK cuando sea apropiado.
+- Auth: JWT (python-jose); access + refresh; no exponer credenciales Moodle.
+- Testing: pytest; tests en `backend/tests/`. Cobertura para lógica crítica.
+- Si la tarea implica >3 archivos, >2 concerns o >200 LOC, evaluar spawning de sub-agentes (api-builder, service-builder, migration-builder). Ver `.ai-system/agents/backend/AGENT.md`.

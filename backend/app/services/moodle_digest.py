@@ -40,6 +40,9 @@ def build_pending_summary(db: Session, user_id: int) -> tuple[str, str]:
         if item.grade_value is None and within_window:
             pending_quizzes.append(item)
 
+    overdue_assignments = [i for i in assignments if i.overdue_marked_at is not None]
+    overdue_quizzes = [i for i in quizzes if i.overdue_marked_at is not None]
+
     subject = "Resumen diario Moodle - Pendientes"
     lines = []
     lines.append(f"Resumen diario ({settings.APP_TIMEZONE}): {now.isoformat()}")
@@ -66,5 +69,22 @@ def build_pending_summary(db: Session, user_id: int) -> tuple[str, str]:
         lines.append(f"- {item.title} ({course}) - cierre {due}")
     if len(pending_quizzes) > 10:
         lines.append(f"... y {len(pending_quizzes) - 10} mas")
+
+    overdue_total = len(overdue_assignments) + len(overdue_quizzes)
+    if overdue_total > 0:
+        lines.append("")
+        lines.append(f"Actividades vencidas (no entregadas - calificacion 0): {overdue_total}")
+        for item in overdue_assignments[:10]:
+            course = item.course.name if item.course else "Curso"
+            due = item.due_at.isoformat() if item.due_at else "Sin fecha"
+            lines.append(f"- {item.title} ({course}) - cierre {due} [no entregado a tiempo]")
+        if len(overdue_assignments) > 10:
+            lines.append(f"... y {len(overdue_assignments) - 10} tareas mas")
+        for item in overdue_quizzes[:10]:
+            course = item.course.name if item.course else "Curso"
+            due = item.due_at.isoformat() if item.due_at else "Sin fecha"
+            lines.append(f"- {item.title} ({course}) - cierre {due} [no realizado a tiempo]")
+        if len(overdue_quizzes) > 10:
+            lines.append(f"... y {len(overdue_quizzes) - 10} cuestionarios mas")
 
     return subject, "\n".join(lines)

@@ -1,10 +1,29 @@
 {
+  "project": {
+    "name": "Moodle Wrapper",
+    "type": "integration-service",
+    "description": "Wrapper API sobre Moodle; integración y automatización sin modificar Moodle."
+  },
   "stack": [
     "backend/python/v3.14",
     "frontend/angular/v17"
   ],
-  "auth": ["auth/jwt"],
-  "database": ["database/postgres"],
-  "api": ["api-design"],
-  "testing": true
+  "auth": ["jwt"],
+  "database": ["databases/postgres"],
+  "api": ["api-design/rest"],
+  "testing": {
+    "enabled": true,
+    "backend": ["unit", "integration"],
+    "frontend": ["unit"]
+  },
+  "deployment": ["docker"],
+  "skills": [
+    "backend/python/v3.14",
+    "frontend/angular/v17",
+    "typescript",
+    "databases/postgres",
+    "jwt",
+    "docker",
+    "testing"
+  ]
 }

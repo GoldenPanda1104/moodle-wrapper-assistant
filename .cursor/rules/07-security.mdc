@@ -1,0 +1,13 @@
+---
+description: "JWT, autenticación y reglas de seguridad."
+globs: ["**/auth/**", "**/core/**", "**/guards/**"]
+alwaysApply: false
+---
+
+# Seguridad
+
+- Cargar skill: `.ai-system/skills/jwt/SKILL.md` (o `.cursor/skills/jwt/SKILL.md`).
+- JWT requerido en endpoints externos; access token + refresh token; rotación soportada. `JWT_SECRET` y `SERVER_MASTER_KEY` en env; nunca en código.
+- Credenciales de Moodle nunca expuestas al cliente; comunicación solo vía APIs oficiales Moodle.
+- Validación de entrada consistente; sin fugas de información sensible en respuestas o logs.
+- Para auditorías de seguridad: sub-agent security-auditor. Ver `.ai-system/agents/sub/architect/security-auditor/AGENT.md`.

@@ -1,0 +1,26 @@
+---
+description: "Regla de arranque obligatoria: cargar AGENTS.md, determinar agente, cargar skills y respetar alcance."
+globs: []
+alwaysApply: true
+---
+
+# Boot rule
+
+Antes de responder a cualquier tarea:
+
+1. Leer `AGENTS.md` en la raíz del proyecto.
+2. Cargar el sistema base desde `.ai-system/` (véase `.ai-system/AGENT.md`).
+3. Comprobar si se actúa como sub-agente (contexto con `parent_agent`).
+4. Si es sub-agente: cargar definición desde `.ai-system/agents/sub/{parent}/{name}/AGENT.md`.
+5. Si es agente principal: determinar agente activo y cargar su `AGENT.md` desde `.ai-system/agents/` o `.cursor/agents/`.
+6. Evaluar complejidad para posible spawning de sub-agentes (archivos > 3, concerns > 2, LOC > 200/150 según agente).
+7. Cargar los skills indicados en `ai/ai.profile.json` y en la regla que aplique por path.
+8. Respetar alcance y permisos; declarar internamente agente/sub-agente y skills activos.
+
+## Eficiencia
+
+- Máximo 3 reintentos por operación fallida; si el mismo error aparece dos veces, hacer análisis de causa raíz antes del tercero.
+- No releer archivos ya presentes en contexto.
+- Usar operaciones en lote o paralelo cuando sea posible.
+- Preferir búsqueda dirigida (globs, patrones) sobre exploración amplia.
+- Resumir hallazgos en lugar de citar archivos completos.

@@ -1,0 +1,13 @@
+---
+description: "Contenedores y convenciones Docker Compose (db, backend, frontend)."
+globs: ["Dockerfile*", "docker-compose*.yml", "**/Dockerfile"]
+alwaysApply: false
+---
+
+# Docker
+
+- Cargar skill: `.ai-system/skills/docker/SKILL.md` (o `.cursor/skills/docker/SKILL.md`).
+- Servicios: `db` (PostgreSQL 16), `backend` (Python/FastAPI), `frontend` (Angular build). Red `app-network`; healthchecks definidos.
+- Backend: `backend/Dockerfile`; comando `alembic upgrade head && uvicorn app.main:app`. Frontend: `assistant-frontend/Dockerfile`; puerto 80.
+- Variables de entorno documentadas en `.env.example`. Para despliegue con Traefik/Dokploy: `docker-compose.dokploy.yml`. Para solo frontend: `docker-compose.frontend.yml`.
+- Cambios de infra/contenedores: sub-agent docker-builder. Ver `.ai-system/agents/sub/architect/docker-builder/AGENT.md`.

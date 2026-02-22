@@ -309,7 +309,11 @@ def upsert_grade_items(
         if stored:
             stored.title = item["title"]
             stored.item_type = item["item_type"]
-            stored.grade_value = item.get("grade_value")
+            incoming_grade = item.get("grade_value")
+            if stored.overdue_marked_at is None or incoming_grade is not None:
+                stored.grade_value = incoming_grade
+                if incoming_grade is not None:
+                    stored.overdue_marked_at = None
             stored.grade_display = item.get("grade_display")
             stored.url = item.get("url")
             stored.available_at = available_at
@@ -340,6 +344,28 @@ def upsert_grade_items(
             )
             db.add(stored)
 
+    db.commit()
+
+
+def mark_overdue_grade_items(db: Session, user_id: int) -> None:
+    """
+    Marca como calificación 0 y no entregada cada ítem con due_at pasada
+    y sin entrega (grade_value None y submission_status sin 'enviado').
+    """
+    now = datetime.now(timezone.utc)
+    query = (
+        db.query(MoodleGradeItem)
+        .join(MoodleCourse)
+        .filter(MoodleCourse.user_id == user_id)
+        .filter(MoodleGradeItem.due_at.isnot(None))
+        .filter(MoodleGradeItem.due_at < now)
+        .filter(MoodleGradeItem.grade_value.is_(None))
+    )
+    for item in query.all():
+        status = (item.submission_status or "").lower()
+        if "enviado" not in status:
+            item.grade_value = 0.0
+            item.overdue_marked_at = now
     db.commit()
 
 

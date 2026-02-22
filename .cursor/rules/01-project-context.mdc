@@ -1,0 +1,14 @@
+---
+description: "Visión del proyecto, stack y restricciones (ai.profile.json + ai.project.md)."
+globs: []
+alwaysApply: true
+---
+
+# Contexto del proyecto
+
+- **Perfil:** Ver `ai/ai.profile.json` para stack (backend Python, frontend Angular), auth (JWT), base de datos (PostgreSQL), testing y skills aplicables.
+- **Visión y restricciones:** Ver `ai/ai.project.md`.
+
+Resumen: Moodle Wrapper — servicio de integración/API sobre Moodle. API-first, stateless, sin modificar Moodle; capas claras (Moodle, lógica de negocio, API pública). JWT obligatorio; credenciales Moodle nunca expuestas. Estabilidad y observabilidad prioritarias.
+
+Respetar siempre las restricciones y el estilo definidos en `ai.project.md` y en las reglas por tecnología (backend, frontend, testing, docker).

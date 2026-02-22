@@ -100,6 +100,7 @@ async def async_run_pipeline(db: Session, user_id: int) -> None:
             db, [survey.__dict__ for survey in surveys], module_map
         )
         crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+        crud_moodle.mark_overdue_grade_items(db, user_id)
 
         previous = get_last_snapshot(user_id)
         snapshot = {
@@ -114,6 +115,7 @@ async def async_run_pipeline(db: Session, user_id: int) -> None:
         logger.info("[Moodle] Diffs detectados: %s", len(diffs))
         for diff in diffs:
             _handle_diff(db, diff, user_id)
+        return diffs
     finally:
         await adapter.close()
 
@@ -183,6 +185,7 @@ async def async_run_grades_pipeline(db: Session, user_id: int) -> None:
         course_map = await _load_or_sync_courses(db, user_id, adapter)
         grade_items = await adapter.get_grades()
         crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+        crud_moodle.mark_overdue_grade_items(db, user_id)
         logger.info("[Moodle] Calificaciones actualizadas: %s", len(grade_items))
     finally:
         await adapter.close()
@@ -196,6 +199,7 @@ async def async_run_quizzes_pipeline(db: Session, user_id: int) -> None:
         course_map = await _load_or_sync_courses(db, user_id, adapter)
         grade_items = await adapter.get_quizzes()
         crud_moodle.upsert_grade_items(db, [item.__dict__ for item in grade_items], course_map)
+        crud_moodle.mark_overdue_grade_items(db, user_id)
         logger.info("[Moodle] Cuestionarios actualizados: %s", len(grade_items))
     finally:
         await adapter.close()
@@ -222,6 +226,7 @@ def apply_ingest_payload(db: Session, user_id: int, snapshot: dict, diffs: list[
     module_map = crud_moodle.upsert_modules(db, modules, course_map)
     crud_moodle.upsert_module_surveys(db, module_surveys, module_map)
     crud_moodle.upsert_grade_items(db, grade_items, course_map)
+    crud_moodle.mark_overdue_grade_items(db, user_id)
 
     save_snapshot(user_id, snapshot)
 

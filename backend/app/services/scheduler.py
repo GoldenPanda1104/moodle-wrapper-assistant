@@ -32,8 +32,19 @@ def start_scheduler() -> None:
         coalesce=True,
         max_instances=1,
     )
+    _scheduler.add_job(
+        _run_hourly_changes,
+        CronTrigger(minute=0),
+        id="moodle_hourly_changes",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
     _scheduler.start()
-    logging.getLogger("scheduler").info("[Scheduler] Daily Moodle jobs scheduled at 08:00 (%s).", settings.APP_TIMEZONE)
+    logging.getLogger("scheduler").info(
+        "[Scheduler] Daily Moodle jobs at 08:00, hourly changes at :00 (%s).",
+        settings.APP_TIMEZONE,
+    )
 
 
 def stop_scheduler() -> None:
@@ -41,6 +52,42 @@ def stop_scheduler() -> None:
     if _scheduler:
         _scheduler.shutdown(wait=False)
         _scheduler = None
+
+
+async def _run_hourly_changes() -> None:
+    """Cada hora: sincroniza Moodle, detecta cambios y notifica por push/email si los hay."""
+    logger = logging.getLogger("scheduler")
+    db = SessionLocal()
+    try:
+        vaults = list_cron_enabled_vaults(db)
+        for vault in vaults:
+            user = db.query(User).filter(User.id == vault.user_id, User.is_active.is_(True)).first()
+            if not user:
+                continue
+            try:
+                diffs = await moodle_pipeline.async_run_pipeline(db, user.id)
+                if not diffs or len(diffs) == 0:
+                    continue
+                prefs = get_notification_preferences(db, user.id)
+                send_email = prefs is None or prefs.email_enabled
+                send_push = prefs is None or prefs.push_enabled
+                subject = "Cambios en Moodle"
+                text = f"Hay {len(diffs)} novedad(es) en Moodle: nuevas tareas, calificaciones o módulos. Revisa la app."
+                if send_email:
+                    await send_mailersend_email(subject, text, to_email=user.email)
+                if send_push:
+                    send_push_to_user(user.id, subject, (text[:200] + "...") if len(text) > 200 else text)
+            except Exception as user_exc:
+                logger.exception(
+                    "[Scheduler] Hourly changes failed for user %s: %s",
+                    user.email,
+                    user_exc,
+                )
+        logger.info("[Scheduler] Hourly changes run completed.")
+    except Exception as exc:
+        logger.exception("[Scheduler] Hourly changes failed: %s", exc)
+    finally:
+        db.close()
 
 
 async def _run_daily_jobs() -> None:

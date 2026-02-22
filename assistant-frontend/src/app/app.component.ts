@@ -7,10 +7,12 @@ import { UserService } from './core/services/user.service';
 import { OneSignalService } from './core/services/onesignal.service';
 import { PwaInstallService } from './core/services/pwa-install.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { of, switchMap, timer } from 'rxjs';
+import { catchError, of, switchMap, timer } from 'rxjs';
 
 const PUSH_BANNER_DISMISSED_KEY = 'suantechs-study-push-banner-dismissed';
 const PUSH_AUTO_PROMPTED_KEY = 'suantechs-study-push-auto-prompted';
+/** Fallback si el backend no devuelve OneSignal config (ej. .env sin ONESIGNAL_APP_ID en el servidor). */
+const FALLBACK_ONESIGNAL_APP_ID = '272e4e2e-18c2-4f00-b6f0-1473a917fe2b';
 
 @Component({
   selector: 'app-root',
@@ -102,17 +104,21 @@ export class AppComponent {
 
     this.notifications
       .getConfig()
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        catchError(() => of({ onesignal_app_id: '', onesignal_web_origin: '', onesignal_enabled: false })),
+      )
       .subscribe((config) => {
-        if (config.onesignal_app_id) {
-          this.oneSignal.init(config.onesignal_app_id, config.onesignal_web_origin);
+        const appId = (config.onesignal_app_id || '').trim() || FALLBACK_ONESIGNAL_APP_ID;
+        const webOrigin = (config.onesignal_web_origin || '').trim() || undefined;
+        if (appId) {
+          this.oneSignal.init(appId, webOrigin || window.location.origin);
           this.hasPushAvailable = true;
           this.users
             .getProfile()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((profile) => {
               this.oneSignal.login(String(profile.id));
-              // Solicitar permiso de push una vez por sesión tras un breve delay.
               try {
                 const alreadyPrompted = sessionStorage.getItem(PUSH_AUTO_PROMPTED_KEY) === '1';
                 if (!alreadyPrompted) {
