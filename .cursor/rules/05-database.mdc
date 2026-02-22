@@ -1,0 +1,13 @@
+---
+description: "Acceso a base de datos, migraciones Alembic y convenciones."
+globs: ["**/alembic/**", "**/migrations/**", "backend/app/models/**", "backend/app/crud/**"]
+alwaysApply: false
+---
+
+# Base de datos
+
+- Cargar skill: `.ai-system/skills/databases/postgres/SKILL.md` (o `.cursor/skills/databases/postgres/SKILL.md`).
+- PostgreSQL 16; SQLAlchemy 2; driver psycopg. Conexión vía `DATABASE_URL` (postgresql+psycopg).
+- Migraciones: Alembic en `backend/alembic/`; versiones en `alembic/versions/`. No modificar migraciones ya aplicadas.
+- Modelos en `backend/app/models/`; acceso a datos en `backend/app/crud/`. Preferir UUIDs para PK cuando sea apropiado.
+- Para cambios de schema: usar migration-builder sub-agent si la tarea es compleja. Ver `.ai-system/agents/sub/backend/migration-builder/AGENT.md`.

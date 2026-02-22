@@ -8,6 +8,7 @@ Create Date: 2026-02-08
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect
 
 revision = "0012_notification_preferences"
 down_revision = "0011_ingest_api_keys"
@@ -16,6 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    insp = inspect(conn)
+    if "notification_preferences" in insp.get_table_names():
+        return
     op.create_table(
         "notification_preferences",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -33,5 +38,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    insp = inspect(conn)
+    if "notification_preferences" not in insp.get_table_names():
+        return
     op.drop_index("ix_notification_preferences_user_id", table_name="notification_preferences")
     op.drop_table("notification_preferences")

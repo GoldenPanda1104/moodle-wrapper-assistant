@@ -14,18 +14,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Study">
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function (OneSignal) {
-      await OneSignal.init({
-        appId: "272e4e2e-18c2-4f00-b6f0-1473a917fe2b",
-        safari_web_id: "web.onesignal.auto.54d60a3d-c0d7-4ae1-b490-c29a9cfa7b70",
-        notifyButton: {
-          enable: true,
-        },
-      });
-    });
-  </script>
+  <!-- OneSignal se inicializa desde Angular (AppComponent) con la config del API o fallback. -->
 </head>
 
 <body>

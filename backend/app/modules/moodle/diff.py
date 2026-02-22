@@ -7,9 +7,13 @@ def _index_by_id(items: list[dict]) -> dict[str, dict]:
     return {item["id"]: item for item in items}
 
 
+def _index_grade_items(items: list[dict]) -> dict[tuple[str, str], dict]:
+    return {(str(item.get("course_id", "")), str(item.get("id", ""))): item for item in items}
+
+
 def diff_snapshots(old: Optional[dict], new: dict) -> list[dict[str, Any]]:
     diffs: list[dict[str, Any]] = []
-    old_data = old or {"courses": [], "modules": []}
+    old_data = old or {"courses": [], "modules": [], "grade_items": []}
 
     old_courses = _index_by_id(old_data.get("courses", []))
     new_courses = _index_by_id(new.get("courses", []))
@@ -91,5 +95,34 @@ def diff_snapshots(old: Optional[dict], new: dict) -> list[dict[str, Any]]:
                     "module_url": module.get("url"),
                 }
             )
+
+    old_grade_items = _index_grade_items(old_data.get("grade_items", []))
+    new_grade_items = _index_grade_items(new.get("grade_items", []))
+    for key, new_item in new_grade_items.items():
+        course_id, item_id = key
+        old_item = old_grade_items.get(key)
+        if old_item is None:
+            diffs.append(
+                {
+                    "type": "grade_item_new",
+                    "course_id": course_id,
+                    "item_id": item_id,
+                    "title": new_item.get("title", ""),
+                    "item_type": new_item.get("item_type", ""),
+                }
+            )
+        else:
+            if old_item.get("grade_value") != new_item.get("grade_value") or old_item.get("submission_status") != new_item.get("submission_status"):
+                diffs.append(
+                    {
+                        "type": "grade_changed",
+                        "course_id": course_id,
+                        "item_id": item_id,
+                        "title": new_item.get("title", ""),
+                        "item_type": new_item.get("item_type", ""),
+                        "old_grade": old_item.get("grade_value"),
+                        "new_grade": new_item.get("grade_value"),
+                    }
+                )
 
     return diffs

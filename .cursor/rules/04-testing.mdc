@@ -1,0 +1,13 @@
+---
+description: "Convenciones de testing y expectativas de cobertura (pytest, Jasmine/Karma)."
+globs: ["**/*.spec.*", "**/*.test.*", "**/tests/**", "**/test_*.py"]
+alwaysApply: false
+---
+
+# Testing
+
+- Cargar skill: `.ai-system/skills/testing/SKILL.md` (o `.cursor/skills/testing/SKILL.md`).
+- Backend: pytest en `backend/tests/`; tests deterministas; sin secretos hardcodeados; nombres que describan el comportamiento.
+- Frontend: Jasmine/Karma en assistant-frontend; pruebas de componentes y comportamiento.
+- Cubrir: happy path, entrada inválida, acceso no autorizado, edge cases. Preferir claridad sobre cleverness.
+- Sub-agentes de testing cuando aplique: unit-test-agent, integration-test-agent, fixture-builder. Ver `.ai-system/agents/tester/AGENT.md`.

@@ -1,0 +1,12 @@
+---
+description: "Flujo Jira: ramas por ticket, PR por agentes, CR y merge manual."
+globs: []
+alwaysApply: false
+---
+
+# Jira workflow
+
+- Una rama por ticket. Formato: `[TICKET]-[descripcion-breve-con-guiones]` (ej. `FOS-5-hacer-test-cor`).
+- Delegator asigna agente y actualiza campo **Agent** en Jira. Backend/Frontend/Tester solo implementan si el issue está asignado a su rol.
+- Agente: crear rama desde main, implementar, commits con feat:/fix:/bug:/chore:, abrir PR hacia main. No hacer merge a main (humano hace CR y merge manual).
+- Detalle completo: `.ai-system/docs/JIRA_BRANCH_WORKFLOW.md`. MCP Atlassian: ver `.cursor/MCP_ATLASSIAN.md` si se usa Jira.

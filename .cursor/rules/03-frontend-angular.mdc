@@ -1,0 +1,13 @@
+---
+description: "Convenciones frontend Angular 17 y skills (frontend/angular/v17, typescript)."
+globs: ["assistant-frontend/**/*.ts", "assistant-frontend/**/*.html"]
+alwaysApply: false
+---
+
+# Frontend Angular
+
+- Cargar skills: `.ai-system/skills/frontend/angular/v17/SKILL.md`, `.ai-system/skills/typescript/SKILL.md` (o equivalentes en `.cursor/skills/`).
+- Angular 17: preferir standalone components; signals para estado local; RxJS para flujos async.
+- Componentes pequeños y enfocados; separar UI de lógica de negocio. Integración con backend vía servicios.
+- Testing: Jasmine/Karma (config existente); validar comportamiento con signals cuando aplique.
+- Si la tarea implica >3 archivos, >2 concerns o >150 LOC, evaluar spawning de sub-agentes (component-builder, state-manager, form-builder). Ver `.ai-system/agents/frontend/AGENT.md`.

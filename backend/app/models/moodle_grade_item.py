@@ -25,6 +25,7 @@ class MoodleGradeItem(Base):
     attempts_allowed = Column(Integer, nullable=True)
     time_limit_minutes = Column(Integer, nullable=True)
     last_seen_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    overdue_marked_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

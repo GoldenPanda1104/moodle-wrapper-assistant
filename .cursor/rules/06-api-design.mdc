@@ -1,0 +1,13 @@
+---
+description: "Diseño de API REST y reglas de contrato (FastAPI, OpenAPI)."
+globs: ["**/api/**", "**/endpoints/**", "**/schemas/**"]
+alwaysApply: false
+---
+
+# API design
+
+- Cargar skills: `.ai-system/skills/api-design/SKILL.md`, `.ai-system/skills/api-design/rest/SKILL.md` (si existen en el catálogo).
+- API v1 bajo `backend/app/api/v1/`; endpoints en `endpoints/`; schemas Pydantic en `schemas/`.
+- REST; respuestas JSON predecibles; códigos de error normalizados (no filtrar ruido de Moodle al cliente).
+- Contratos estables y documentados (OpenAPI/Swagger desde FastAPI). Tipado explícito en request/response.
+- Para nuevos endpoints o rutas: api-builder sub-agent si la tarea es compleja. Ver `.ai-system/agents/sub/backend/api-builder/AGENT.md`.
