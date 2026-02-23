@@ -17,7 +17,10 @@ app.include_router(api_router, prefix="/v1")
 
 @app.on_event("startup")
 def on_startup() -> None:
-    start_scheduler()
+    try:
+        start_scheduler()
+    except Exception as exc:
+        logging.getLogger("api").exception("Scheduler failed to start (cron jobs disabled): %s", exc)
 
 
 @app.on_event("shutdown")
